@@ -25,6 +25,14 @@
 #include <stdint.h>
 #include <assert.h>
 
+#define MJ_RET_ON_NULL(x, fmt, ...) do {                \
+            if (x == NULL) {                            \
+                fprintf(stderr, fmt, ##__VA_ARGS__);    \
+                return -1;                              \
+            }                                           \
+        } while (0)
+
+
 typedef enum {
     MJTOK_IDENTIFIER,               /* aA-zZ */
     MJTOK_SEP_BRACE_OPEN,           /* { */
@@ -64,16 +72,11 @@ static void init_tok_arr(mjarr_t *arr)
     arr->tokens = malloc(arr->cap * sizeof(*arr->tokens));
 }
 
-static void append_tok(mjarr_t *arr, mjtok_t token)
+static int append_tok(mjarr_t *arr, mjtok_t token)
 {
     if (arr->count >= arr->cap) {
         size_t new_cap = arr->cap * MJTOK_ARRAY_GROWTH_FACTOR;
-        mjtok_t *tmp = realloc(arr->tokens, new_cap * sizeof(*arr->tokens));
-        if (tmp == NULL) {
-            fprintf(stderr, "Out of memory failure");
-            free(arr->tokens);
-            exit(1);
-        }
+        MJ_RET_ON_NULL(realloc(arr->tokens, new_cap * sizeof(*arr->tokens)), "Out of memory failure");
     }
 
     arr->tokens[arr->count++] = token;
