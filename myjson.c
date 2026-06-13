@@ -48,18 +48,25 @@
             }                                               \
         } while (0)
 
+#define MJ_RET_ON_FALSE(x, fmt, ...) do {                   \
+            if (x) {                                        \
+                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
+                return -1;                                  \
+            }                                               \
+        } while (0)
+
 typedef enum {
     MJTOK_IDENTIFIER,               /* aA-zZ */
-    MJTOK_SEP_BRACE_OPEN,           /* { */
-    MJTOK_SEP_BRACE_CLOSE,          /* } */
-    MJTOK_SEP_BRACKET_OPEN,         /* [ */
-    MJTOK_SEP_BRACKET_CLOSE,        /* ] */
-    MJTOK_SEP_COLON,                /* : */
-    MJTOK_SEP_COMMA,                /* , */
-    MJTOK_LIT_STRING,               /* aA-zZ*/
-    MJTOK_LIT_INTEGER,              /* 0-9 */
-    MJTOK_LIT_FRACTION,             /* 0.0-9.0*/
-    MJTOK_LIT_EXPONENT,             /* ex: 1.5e4, 6.022e-23 */
+    MJTOK_BRACE_OPEN,               /* { */
+    MJTOK_BRACE_CLOSE,              /* } */
+    MJTOK_BRACKET_OPEN,             /* [ */
+    MJTOK_BRACKET_CLOSE,            /* ] */
+    MJTOK_COLON,                    /* : */
+    MJTOK_COMMA,                    /* , */
+    MJTOK_STRING,                   /* aA-zZ*/
+    MJTOK_INTEGER,                  /* 0-9 */
+    MJTOK_FRACTION,                 /* 0.0-9.0*/
+    MJTOK_EXPONENT,                 /* ex: 1.5e4, 6.022e-23 */
     //TODO:
 } mjtok_type_t;
 
@@ -84,6 +91,8 @@ typedef struct {
 #define is_bracket_open(x)          (x == '[')
 #define is_bracket_close(x)         (x == ']')
 #define is_colon(x)                 (x == ':')
+#define is_comma(x)                 (x == ',')
+#define is_quote_double(x)          (x == '"')
 
 static void init_tok_arr(mjarr_t *arr) 
 {
@@ -123,6 +132,38 @@ static inline mjtok_t new_tok(mjtok_type_t t, const void *val, const char *pos, 
     return token;
 }
 
+static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
+{
+    assert(arr && *cptr && out && "Cannot be null");
+
+    char *val = *cptr;
+    char *start = *cptr;
+    size_t val_len = 0;
+    int quote_count = 0;
+
+    /* Caller should call scan_str() if first quote
+       is found, but here we make sure that this is true.
+       If not, return an error. 
+       */
+    MJ_RET_ON_FALSE(!is_quote_double(**cptr), "Invalid string");
+
+    for ( ; *cptr && **cptr != '\0' && quote_count < 2; (*cptr)++, val_len++) {
+        printf("-->%c\n", **cptr);
+        if (is_quote_double(**cptr)) {
+            quote_count++;
+            continue;
+        }
+        MJ_RET_ON_FALSE(!isalpha((unsigned char) **cptr), "Invalid string");
+    } 
+
+    out->type = MJTOK_STRING;
+    out->value = val;
+    out->start = start;
+    out->len = val_len;
+
+    return 0;
+}
+
 static int tokenize_json (mjarr_t *arr, char *const json)
 {
     char *cptr = json; 
@@ -133,23 +174,33 @@ static int tokenize_json (mjarr_t *arr, char *const json)
             goto advance;
         }
         if (is_brace_open(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_SEP_BRACE_OPEN, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_OPEN, cptr, cptr, 1)));
             goto advance;
         }
         if (is_brace_close(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_SEP_BRACE_CLOSE, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_CLOSE, cptr, cptr, 1)));
             goto advance;
         }
         if (is_colon(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_SEP_COLON, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_COLON, cptr, cptr, 1)));
             goto advance;
         }
         if (is_bracket_open(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_SEP_BRACE_OPEN, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_OPEN, cptr, cptr, 1)));
             goto advance;
         }
         if (is_bracket_close(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_SEP_BRACE_CLOSE, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_CLOSE, cptr, cptr, 1)));
+            goto advance;
+        }
+        if (is_comma(*cptr)) {
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_COMMA, cptr, cptr, 1)));
+            goto advance;
+        }
+        if (is_quote_double(*cptr)) {
+            mjtok_t tok;
+            MJ_RET_ON_ERR2(scan_str(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
         //TODO
@@ -181,11 +232,12 @@ void test() {
 
     mjarr_t arr2; 
     init_tok_arr(&arr2);
-    char buf[] = "{\"a\":\"b\", \"c\":[]}";
-    char *str = buf;
+    //char *str = R"({"a":"b", "c":[]})";
+    char *str = "{\"a\":\"b\", \"c\":[]}";
+    printf("%s\n", str);
     tokenize_json(&arr2, str);
 
-    for (int i = 0; i < arr2.count; i++)
+    for (size_t i = 0; i < arr2.count; i++)
         printf("token: type=%d, value=%c, start=%p, len=%zu\n",
                 arr2.tokens[i].type, *(char *) arr2.tokens[i].value, arr2.tokens[i].start, arr2.tokens[i].len);
 }
