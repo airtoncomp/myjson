@@ -64,11 +64,9 @@ typedef enum {
     MJTOK_COLON,                    /* : */
     MJTOK_COMMA,                    /* , */
     MJTOK_STRING,                   /* aA-zZ*/
-    MJTOK_NUMBER,                   /* 0-9, 0.0-9.9*/
-    MJTOK_INTEGER,                  /* 0-9 */
-    MJTOK_FRACTION,                 /* 0.0-9.0*/
-    MJTOK_EXPONENT,                 /* ex: 1.5e4, 6.022e-23 */
-    //TODO:
+    MJTOK_NUMBER,                   /* ex: 0-9, 0.0-9.9, 0e50 */
+    MJTOK_BOOL,                     /* true or false */
+    MJTOK_NULL                      /* null */
 } mjtok_type_t;
 
 typedef struct {
@@ -106,6 +104,14 @@ typedef struct {
 #define is_tab_t(x)                 (x == 't')
 #define is_hex_u(x)                 (x == 'u')
 #define is_exponent(x)              (x == 'e' || x == 'E')
+
+static const char _bool_true[4] = "true";
+static const char _bool_false[5] = "false";
+static const char _value_null[4] = "null";
+
+#define CHAR_OF_TRUE(x)     _bool_true[x]
+#define CHAR_OF_FALSE(x)    _bool_false[x]
+#define CHAR_OF_NULL(x)     _value_null[4]
 
 static void init_tok_arr(mjarr_t *arr) 
 {
@@ -214,7 +220,7 @@ static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
     char *start = *cptr;
     size_t val_len = 0;
 
-    /* Caller should have checked that first character might be 
+    /* Caller should check that first character might be 
        valid digit ranging from 0-9 or starting with '-' symbol.
        This is just a check for safety. Return -1 if not true.
        */
@@ -257,6 +263,102 @@ static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
     }
 
     out->type = MJTOK_NUMBER;
+    out->value = val;
+    out->start = start;
+    out->len = ++val_len;
+
+    char buf[256] = {0};
+    snprintf(buf, val_len, "%s", val);
+    buf[val_len] = '\0';
+    printf("string: %s\n", buf);
+
+    return 0;
+}
+
+static int scan_bool_true(mjarr_t *arr, char **cptr, mjtok_t *out)
+{
+    assert(arr && *cptr && out && "Cannot be null");
+
+    char *val = *cptr;
+    char *start = *cptr;
+    size_t val_len = 0;
+
+    /* Caller should check first if the character is 't' before
+       calling this function. This is just a check for safety.
+       Return -1 if not true.
+       */
+    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_TRUE(0)), "Invalid boolean");
+
+    int next_idx = 0;
+    for ( ; *cptr && **cptr != '\0' && next_idx < 4; (*cptr)++, val_len++) {
+        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_TRUE(next_idx++)), "Invalid boolean");
+    }
+
+    out->type = MJTOK_BOOL;
+    out->value = val;
+    out->start = start;
+    out->len = ++val_len;
+
+    char buf[256] = {0};
+    snprintf(buf, val_len, "%s", val);
+    buf[val_len] = '\0';
+    printf("string: %s\n", buf);
+
+    return 0;
+}
+
+static int scan_bool_false(mjarr_t *arr, char **cptr, mjtok_t *out)
+{
+    assert(arr && *cptr && out && "Cannot be null");
+
+    char *val = *cptr;
+    char *start = *cptr;
+    size_t val_len = 0;
+
+    /* Caller should check first if the character is 'f' before
+       calling this function. This is just a check for safety.
+       Return -1 if not true.
+       */
+    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_FALSE(0)), "Invalid boolean");
+
+    int next_idx = 0;
+    for ( ; *cptr && **cptr != '\0' && next_idx < 5; (*cptr)++, val_len++) {
+        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_FALSE(next_idx++)), "Invalid boolean");
+    }
+
+    out->type = MJTOK_BOOL;
+    out->value = val;
+    out->start = start;
+    out->len = ++val_len;
+
+    char buf[256] = {0};
+    snprintf(buf, val_len, "%s", val);
+    buf[val_len] = '\0';
+    printf("string: %s\n", buf);
+
+    return 0;
+}
+
+static int scan_value_null(mjarr_t *arr, char **cptr, mjtok_t *out)
+{
+    assert(arr && *cptr && out && "Cannot be null");
+
+    char *val = *cptr;
+    char *start = *cptr;
+    size_t val_len = 0;
+
+    /* Caller should check first if the character is 'n' before
+       calling this function. This is just a check for safety.
+       Return -1 if not true.
+       */
+    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(0)), "Invalid boolean");
+
+    int next_idx = 0;
+    for ( ; *cptr && **cptr != '\0' && next_idx < 5; (*cptr)++, val_len++) {
+        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(next_idx++)), "Invalid boolean");
+    }
+
+    out->type = MJTOK_NULL;
     out->value = val;
     out->start = start;
     out->len = ++val_len;
@@ -314,6 +416,24 @@ static int tokenize_json (mjarr_t *arr, char *const json)
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
+        if (*cptr == CHAR_OF_TRUE(0)) {
+            mjtok_t tok;
+            MJ_RET_ON_ERR2(scan_bool_true(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(append_tok(arr, tok));
+            goto advance;
+        }
+        if (*cptr == CHAR_OF_FALSE(0)) {
+            mjtok_t tok;
+            MJ_RET_ON_ERR2(scan_bool_false(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(append_tok(arr, tok));
+            goto advance;
+        }
+        if (*cptr == CHAR_OF_NULL(0)) {
+            mjtok_t tok;
+            MJ_RET_ON_ERR2(scan_value_null(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(append_tok(arr, tok));
+            goto advance;
+        }
         //TODO
 advance:
         cptr++;
@@ -345,7 +465,8 @@ void test() {
     init_tok_arr(&arr2);
     //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
     //char *str = "{\"a\":\"b\", \"c\":[]}";
-    char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
+    //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
+    char *str = R"("a":true, "b":false, "c":null)";
     printf("%s\n", str);
     tokenize_json(&arr2, str);
 
