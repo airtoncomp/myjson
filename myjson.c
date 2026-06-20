@@ -48,7 +48,7 @@
             }                                               \
         } while (0)
 
-#define MJ_RET_ON_FALSE(x, fmt, ...) do {                   \
+#define MJ_RET_ON_TRUE(x, fmt, ...) do {                   \
             if (x) {                                        \
                 fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
@@ -64,6 +64,7 @@ typedef enum {
     MJTOK_COLON,                    /* : */
     MJTOK_COMMA,                    /* , */
     MJTOK_STRING,                   /* aA-zZ*/
+    MJTOK_NUMBER,                   /* 0-9, 0.0-9.9*/
     MJTOK_INTEGER,                  /* 0-9 */
     MJTOK_FRACTION,                 /* 0.0-9.0*/
     MJTOK_EXPONENT,                 /* ex: 1.5e4, 6.022e-23 */
@@ -93,6 +94,10 @@ typedef struct {
 #define is_colon(x)                 (x == ':')
 #define is_comma(x)                 (x == ',')
 #define is_quote_double(x)          (x == '"')
+#define is_minus(x)                 (x == '-')
+#define is_plus(x)                  (x == '+')
+#define is_dot(x)                   (x == '.')
+#define is_exponent(x)              (x == 'e' || x == 'E')
 
 static void init_tok_arr(mjarr_t *arr) 
 {
@@ -145,21 +150,88 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
        is found, but here we make sure that this is true.
        If not, return an error. 
        */
-    MJ_RET_ON_FALSE(!is_quote_double(**cptr), "Invalid string");
+    MJ_RET_ON_TRUE(!is_quote_double(**cptr), "Invalid string");
 
     for ( ; *cptr && **cptr != '\0' && quote_count < 2; (*cptr)++, val_len++) {
-        printf("-->%c\n", **cptr);
         if (is_quote_double(**cptr)) {
             quote_count++;
             continue;
         }
-        MJ_RET_ON_FALSE(!isalpha((unsigned char) **cptr), "Invalid string");
+        MJ_RET_ON_TRUE(!isalpha((unsigned char) **cptr), "Invalid string");
     } 
 
     out->type = MJTOK_STRING;
     out->value = val;
     out->start = start;
-    out->len = val_len;
+    out->len = ++val_len;
+    
+    char buf[256] = {0};
+    snprintf(buf, val_len, "%s", val);
+    buf[val_len] = '\0';
+    printf("string: %s\n", buf);
+
+    return 0;
+}
+
+static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
+{
+    assert(arr && *cptr && out && "Cannot be null");
+
+    char *val = *cptr;
+    char *start = *cptr;
+    size_t val_len = 0;
+
+    /* Caller should have checked that first character might be 
+       valid digit ranging from 0-9 or starting with '-' symbol.
+       This is just a check for safety. Return -1 if not true.
+       */
+    MJ_RET_ON_TRUE(!(isdigit(**cptr) || is_minus(**cptr)), "Invalid number");
+
+    if (is_minus(**cptr)) {
+        (*cptr)++; val_len++;
+        MJ_RET_ON_TRUE(*cptr && !isdigit(**cptr), "Invalid number");
+    }
+
+    if (isdigit(**cptr)) {
+        for ( ;*cptr && **cptr != '\0'; (*cptr)++, val_len++) {
+            if (!isdigit(**cptr)) break;
+        }
+        if (is_dot(**cptr)) {
+            (*cptr)++; val_len++;
+            MJ_RET_ON_TRUE(is_exponent(**cptr), "Invalid digit after dot");
+            for ( ;*cptr && **cptr != '\0'; (*cptr)++, val_len++) {
+                if (!isdigit(**cptr)) break;
+            }
+            if (is_exponent(**cptr)) {
+                (*cptr)++; val_len++;
+                if (is_minus(**cptr) || is_plus(**cptr)) {
+                    (*cptr)++; val_len++;
+                }
+                for ( ;*cptr && **cptr != '\0'; (*cptr)++, val_len++) {
+                    if (!isdigit(**cptr)) break;
+                }
+            }
+        }
+        if (is_exponent(**cptr)) {
+            (*cptr)++; val_len++;
+            if (is_minus(**cptr) || is_plus(**cptr)) {
+                (*cptr)++; val_len++;
+            }
+            for ( ;*cptr && **cptr != '\0'; (*cptr)++, val_len++) {
+                if (!isdigit(**cptr)) break;
+            }
+        }
+    }
+
+    out->type = MJTOK_NUMBER;
+    out->value = val;
+    out->start = start;
+    out->len = ++val_len;
+
+    char buf[256] = {0};
+    snprintf(buf, val_len, "%s", val);
+    buf[val_len] = '\0';
+    printf("string: %s\n", buf);
 
     return 0;
 }
@@ -203,6 +275,12 @@ static int tokenize_json (mjarr_t *arr, char *const json)
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
+        if (isdigit(*cptr) || is_minus(*cptr)) {
+            mjtok_t tok;
+            MJ_RET_ON_ERR2(scan_num(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(append_tok(arr, tok));
+            goto advance;
+        }
         //TODO
 advance:
         cptr++;
@@ -232,8 +310,9 @@ void test() {
 
     mjarr_t arr2; 
     init_tok_arr(&arr2);
-    //char *str = R"({"a":"b", "c":[]})";
-    char *str = "{\"a\":\"b\", \"c\":[]}";
+    //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
+    //char *str = "{\"a\":\"b\", \"c\":[]}";
+    char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
     printf("%s\n", str);
     tokenize_json(&arr2, str);
 
