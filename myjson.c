@@ -48,7 +48,7 @@
             }                                               \
         } while (0)
 
-#define MJ_RET_ON_TRUE(x, fmt, ...) do {                   \
+#define MJ_RET_ON_TRUE(x, fmt, ...) do {                    \
             if (x) {                                        \
                 fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
@@ -97,6 +97,14 @@ typedef struct {
 #define is_minus(x)                 (x == '-')
 #define is_plus(x)                  (x == '+')
 #define is_dot(x)                   (x == '.')
+#define is_bslash(x)                (x == '\\')
+#define is_fslash(x)                (x == '/')
+#define is_backspc_b(x)             (x == 'b')
+#define is_formfeed_f(x)            (x == 'f')
+#define is_linefeed_n(x)            (x == 'n')
+#define is_carret_r(x)              (x == 'r')
+#define is_tab_t(x)                 (x == 't')
+#define is_hex_u(x)                 (x == 'u')
 #define is_exponent(x)              (x == 'e' || x == 'E')
 
 static void init_tok_arr(mjarr_t *arr) 
@@ -156,6 +164,31 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
         if (is_quote_double(**cptr)) {
             quote_count++;
             continue;
+        }
+        if (is_bslash(**cptr)) {
+            (*cptr)++; val_len++;
+            MJ_RET_ON_TRUE(!(*cptr && **cptr != '\0'), "Invalid string");
+            if (is_quote_double(**cptr) 
+                || is_bslash(**cptr)
+                || is_fslash(**cptr)
+                || is_backspc_b(**cptr)
+                || is_formfeed_f(**cptr)
+                || is_linefeed_n(**cptr)
+                || is_carret_r(**cptr)
+                || is_tab_t(**cptr)) {
+                (*cptr)++; val_len++;
+                continue;
+            }
+            if (is_hex_u(**cptr)) {
+                (*cptr)++; val_len++;
+                MJ_RET_ON_TRUE(!(*cptr && **cptr != '\0'), "Invalid string");
+                int hex_count = 0;
+                for ( ; *cptr && **cptr != '\0' && hex_count < 4; (*cptr)++, val_len++) {
+                    MJ_RET_ON_TRUE(!isxdigit((unsigned char) **cptr), "Invalid string");
+                    hex_count++;
+                }
+                continue;
+            }
         }
         MJ_RET_ON_TRUE(!isalpha((unsigned char) **cptr), "Invalid string");
     } 
@@ -242,7 +275,7 @@ static int tokenize_json (mjarr_t *arr, char *const json)
 
     while (cptr && *cptr != '\0') {
         printf("char: %c\n", *cptr);
-        if (isspace((unsigned char) *cptr) || *cptr == '\t') {
+        if (isspace((unsigned char) *cptr) || *cptr == '\t' || *cptr == '\n' || *cptr == '\r') {
             goto advance;
         }
         if (is_brace_open(*cptr)) {
