@@ -41,15 +41,17 @@
         } while(0)
 
 #define MJ_LOG_STR(fmt, start, len, ...) do {                           \
-            char buf[256] = {0};                                        \
+            char buf[1024] = {0};                                       \
             snprintf(buf, len, "%s", start);                            \
             buf[val_len] = '\0';                                        \
             MJ_LOG(fmt, buf, ##__VA_ARGS__);                            \
         } while(0)
+
 #else
 
-#define MJ_LOG(stdout, ...)    ((void)0)
-#define MJ_LOGE(stderr, ...)   ((void)0)
+#define MJ_LOG(stdout, ...)                 ((void)0)
+#define MJ_LOGE(stderr, ...)                ((void)0)
+#define MJ_LOG_STR(fmt, start, len, ...)    ((void) 0)
 
 #endif
 
