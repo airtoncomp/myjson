@@ -28,32 +28,57 @@
 #include <assert.h>
 #include <ctype.h>
 
+#ifdef DEBUG
+
+#define MJ_LOG(...) do {                                                \
+            fprintf(stdout, "[DEBUG] %s:%d: ", __FILE__, __LINE__);     \
+            fprintf(stdout, __VA_ARGS__);                               \
+        } while(0)
+
+#define MJ_LOGE(...) do {                                               \
+            fprintf(stderr, "[DEBUG] %s:%d: ", __FILE__, __LINE__);     \
+            fprintf(stderr, __VA_ARGS__);                               \
+        } while(0)
+
+#define MJ_LOG_STR(fmt, start, len, ...) do {                           \
+            char buf[256] = {0};                                        \
+            snprintf(buf, len, "%s", start);                            \
+            buf[val_len] = '\0';                                        \
+            MJ_LOG(fmt, buf, ##__VA_ARGS__);                            \
+        } while(0)
+#else
+
+#define MJ_LOG(stdout, ...)    ((void)0)
+#define MJ_LOGE(stderr, ...)   ((void)0)
+
+#endif
+
 #define MJ_RET_ON_NULL(x, fmt, ...) do {                    \
             if (x == NULL) {                                \
                 fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
             }                                               \
-        } while (0)
+        } while(0)
 
 #define MJ_RET_ON_ERR(x, fmt, ...) do {                     \
             if (x < 0) {                                    \
                 fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
             }                                               \
-        } while (0)
+        } while(0)
 
 #define MJ_RET_ON_ERR2(x) do {                              \
             if (x < 0) {                                    \
                 return -1;                                  \
             }                                               \
-        } while (0)
+        } while(0)
 
 #define MJ_RET_ON_TRUE(x, fmt, ...) do {                    \
             if (x) {                                        \
                 fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
             }                                               \
-        } while (0)
+        } while(0)
 
 typedef enum {
     MJTOK_IDENTIFIER,               /* aA-zZ */
@@ -111,7 +136,7 @@ static const char _value_null[4] = "null";
 
 #define CHAR_OF_TRUE(x)     _bool_true[x]
 #define CHAR_OF_FALSE(x)    _bool_false[x]
-#define CHAR_OF_NULL(x)     _value_null[4]
+#define CHAR_OF_NULL(x)     _value_null[x]
 
 static void init_tok_arr(mjarr_t *arr) 
 {
@@ -204,10 +229,7 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
     out->start = start;
     out->len = ++val_len;
     
-    char buf[256] = {0};
-    snprintf(buf, val_len, "%s", val);
-    buf[val_len] = '\0';
-    printf("string: %s\n", buf);
+    MJ_LOG_STR("string: %s\n", val, val_len);
 
     return 0;
 }
@@ -267,10 +289,7 @@ static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
     out->start = start;
     out->len = ++val_len;
 
-    char buf[256] = {0};
-    snprintf(buf, val_len, "%s", val);
-    buf[val_len] = '\0';
-    printf("string: %s\n", buf);
+    MJ_LOG_STR("string: %s\n", val, val_len);
 
     return 0;
 }
@@ -299,10 +318,7 @@ static int scan_bool_true(mjarr_t *arr, char **cptr, mjtok_t *out)
     out->start = start;
     out->len = ++val_len;
 
-    char buf[256] = {0};
-    snprintf(buf, val_len, "%s", val);
-    buf[val_len] = '\0';
-    printf("string: %s\n", buf);
+    MJ_LOG_STR("string: %s\n", val, val_len);
 
     return 0;
 }
@@ -331,10 +347,7 @@ static int scan_bool_false(mjarr_t *arr, char **cptr, mjtok_t *out)
     out->start = start;
     out->len = ++val_len;
 
-    char buf[256] = {0};
-    snprintf(buf, val_len, "%s", val);
-    buf[val_len] = '\0';
-    printf("string: %s\n", buf);
+    MJ_LOG_STR("string: %s\n", val, val_len);
 
     return 0;
 }
@@ -351,11 +364,11 @@ static int scan_value_null(mjarr_t *arr, char **cptr, mjtok_t *out)
        calling this function. This is just a check for safety.
        Return -1 if not true.
        */
-    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(0)), "Invalid boolean");
+    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(0)), "Invalid null");
 
     int next_idx = 0;
-    for ( ; *cptr && **cptr != '\0' && next_idx < 5; (*cptr)++, val_len++) {
-        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(next_idx++)), "Invalid boolean");
+    for ( ; *cptr && **cptr != '\0' && next_idx < 4; (*cptr)++, val_len++) {
+        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(next_idx++)), "Invalid null");
     }
 
     out->type = MJTOK_NULL;
@@ -363,20 +376,17 @@ static int scan_value_null(mjarr_t *arr, char **cptr, mjtok_t *out)
     out->start = start;
     out->len = ++val_len;
 
-    char buf[256] = {0};
-    snprintf(buf, val_len, "%s", val);
-    buf[val_len] = '\0';
-    printf("string: %s\n", buf);
+    MJ_LOG_STR("string: %s\n", val, val_len);
 
     return 0;
 }
 
-static int tokenize_json (mjarr_t *arr, char *const json)
+static int tokenize_json(mjarr_t *arr, char *const json)
 {
     char *cptr = json; 
 
     while (cptr && *cptr != '\0') {
-        printf("char: %c\n", *cptr);
+        MJ_LOG("char: %c\n", *cptr);
         if (isspace((unsigned char) *cptr) || *cptr == '\t' || *cptr == '\n' || *cptr == '\r') {
             goto advance;
         }
@@ -434,7 +444,6 @@ static int tokenize_json (mjarr_t *arr, char *const json)
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
-        //TODO
 advance:
         cptr++;
     }
@@ -466,7 +475,7 @@ void test() {
     //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
     //char *str = "{\"a\":\"b\", \"c\":[]}";
     //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
-    char *str = R"("a":true, "b":false, "c":null)";
+    char *str = R"({"a":true, "b":false, "c":null})";
     printf("%s\n", str);
     tokenize_json(&arr2, str);
 
