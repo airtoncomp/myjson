@@ -99,7 +99,6 @@ typedef enum {
 typedef struct {
     mjtok_type_t    type;
     const void      *value;
-    const char      *start;
     size_t          len;
 } mjtok_t;
 
@@ -166,12 +165,11 @@ static int append_tok(mjarr_t *arr, mjtok_t token)
     return 0;
 }
 
-static inline mjtok_t new_tok(mjtok_type_t t, const void *val, const char *pos, size_t val_len)
+static inline mjtok_t new_tok(mjtok_type_t t, const void *val, size_t val_len)
 {
     mjtok_t token = {
             .type = t,
             .value = val,
-            .start = pos, 
             .len = val_len
         };
 
@@ -183,7 +181,6 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
     assert(arr && *cptr && out && "Cannot be null");
 
     char *val = *cptr;
-    char *start = *cptr;
     size_t val_len = 0;
     int quote_count = 0;
 
@@ -228,7 +225,6 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
 
     out->type = MJTOK_STRING;
     out->value = val;
-    out->start = start;
     out->len = ++val_len;
     
     MJ_LOG_STR("string: %s\n", val, val_len);
@@ -241,7 +237,6 @@ static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
     assert(arr && *cptr && out && "Cannot be null");
 
     char *val = *cptr;
-    char *start = *cptr;
     size_t val_len = 0;
 
     /* Caller should check that first character might be 
@@ -288,7 +283,6 @@ static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
 
     out->type = MJTOK_NUMBER;
     out->value = val;
-    out->start = start;
     out->len = ++val_len;
 
     MJ_LOG_STR("string: %s\n", val, val_len);
@@ -301,7 +295,6 @@ static int scan_bool_true(mjarr_t *arr, char **cptr, mjtok_t *out)
     assert(arr && *cptr && out && "Cannot be null");
 
     char *val = *cptr;
-    char *start = *cptr;
     size_t val_len = 0;
 
     /* Caller should check first if the character is 't' before
@@ -317,7 +310,6 @@ static int scan_bool_true(mjarr_t *arr, char **cptr, mjtok_t *out)
 
     out->type = MJTOK_BOOL;
     out->value = val;
-    out->start = start;
     out->len = ++val_len;
 
     MJ_LOG_STR("string: %s\n", val, val_len);
@@ -330,7 +322,6 @@ static int scan_bool_false(mjarr_t *arr, char **cptr, mjtok_t *out)
     assert(arr && *cptr && out && "Cannot be null");
 
     char *val = *cptr;
-    char *start = *cptr;
     size_t val_len = 0;
 
     /* Caller should check first if the character is 'f' before
@@ -346,7 +337,6 @@ static int scan_bool_false(mjarr_t *arr, char **cptr, mjtok_t *out)
 
     out->type = MJTOK_BOOL;
     out->value = val;
-    out->start = start;
     out->len = ++val_len;
 
     MJ_LOG_STR("string: %s\n", val, val_len);
@@ -359,7 +349,6 @@ static int scan_value_null(mjarr_t *arr, char **cptr, mjtok_t *out)
     assert(arr && *cptr && out && "Cannot be null");
 
     char *val = *cptr;
-    char *start = *cptr;
     size_t val_len = 0;
 
     /* Caller should check first if the character is 'n' before
@@ -375,7 +364,6 @@ static int scan_value_null(mjarr_t *arr, char **cptr, mjtok_t *out)
 
     out->type = MJTOK_NULL;
     out->value = val;
-    out->start = start;
     out->len = ++val_len;
 
     MJ_LOG_STR("string: %s\n", val, val_len);
@@ -393,27 +381,27 @@ static int tokenize_json(mjarr_t *arr, char *const json)
             goto advance;
         }
         if (is_brace_open(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_OPEN, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_OPEN, cptr, 1)));
             goto advance;
         }
         if (is_brace_close(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_CLOSE, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_CLOSE, cptr, 1)));
             goto advance;
         }
         if (is_colon(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_COLON, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_COLON, cptr, 1)));
             goto advance;
         }
         if (is_bracket_open(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_OPEN, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_OPEN, cptr, 1)));
             goto advance;
         }
         if (is_bracket_close(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_CLOSE, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_CLOSE, cptr, 1)));
             goto advance;
         }
         if (is_comma(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_COMMA, cptr, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_COMMA, cptr, 1)));
             goto advance;
         }
         if (is_quote_double(*cptr)) {
@@ -459,7 +447,6 @@ void test() {
     mjtok_t token = {
         .type = MJTOK_IDENTIFIER,
         .value = "a",
-        .start = 0,
         .len = 1
     };
     append_tok(&array, token);
@@ -467,7 +454,6 @@ void test() {
     mjtok_t token2 = {
         .type = MJTOK_IDENTIFIER,
         .value = "b",
-        .start = 0,
         .len = 1
     };
     append_tok(&array, token2);
@@ -482,6 +468,6 @@ void test() {
     tokenize_json(&arr2, str);
 
     for (size_t i = 0; i < arr2.count; i++)
-        printf("token: type=%d, value=%c, start=%p, len=%zu\n",
-                arr2.tokens[i].type, *(char *) arr2.tokens[i].value, arr2.tokens[i].start, arr2.tokens[i].len);
+        printf("token: type=%d, value=%c, len=%zu\n",
+                arr2.tokens[i].type, *(char *) arr2.tokens[i].value, arr2.tokens[i].len);
 }
