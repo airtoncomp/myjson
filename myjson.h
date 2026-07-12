@@ -22,4 +22,16 @@
 #ifndef _MYJSON_H_
 #define _MYJSON_H_
 
+#include <string.h>
+
+typedef struct myjson myjson_t;
+
+/**
+ * Public.
+ * User should use 'myjson_t' as main variable to represent 
+ * json data and make call to functions that use this type.
+ */
+
+int myjson_parse(myjson_t *mj, const char *json);
+
 #endif
