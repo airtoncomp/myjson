@@ -28,6 +28,8 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include "myjson.h"
+
 #ifdef DEBUG
 
 #define MJ_LOG(...) do {                                                \
@@ -51,12 +53,19 @@
 
 #define MJ_LOG(stdout, ...)                 ((void)0)
 #define MJ_LOGE(stderr, ...)                ((void)0)
-#define MJ_LOG_STR(fmt, start, len, ...)    ((void) 0)
+#define MJ_LOG_STR(fmt, start, len, ...)    ((void)0)
 
 #endif
 
-#define MJ_RET_ON_NULL(x, fmt, ...) do {                    \
+#define MJ_RET_ERR_ON_NULL(x, fmt, ...) do {                \
             if (x == NULL) {                                \
+                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
+                return -1;                                  \
+            }                                               \
+        } while(0)
+
+#define MJ_RET_ERR_ON_TRUE(x, fmt, ...) do {                \
+            if (x) {                                        \
                 fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
             }                                               \
@@ -75,12 +84,6 @@
             }                                               \
         } while(0)
 
-#define MJ_RET_ON_TRUE(x, fmt, ...) do {                    \
-            if (x) {                                        \
-                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
-                return -1;                                  \
-            }                                               \
-        } while(0)
 
 /**
  * MyJSON Lexer
@@ -164,7 +167,7 @@ static int append_tok(mjarr_t *arr, mjtok_t token)
     if (arr->count >= arr->cap) {
         size_t new_cap = arr->cap * MJTOK_ARRAY_GROWTH_FACTOR;
         mjtok_t *tmp = realloc(arr->tokens, new_cap * sizeof(*arr->tokens));
-        MJ_RET_ON_NULL(tmp, "Out of memory failure");
+        MJ_RET_ERR_ON_NULL(tmp, "Out of memory failure");
         arr->tokens = tmp;
         arr->cap = new_cap;
     }
@@ -185,11 +188,11 @@ static inline mjtok_t new_tok(mjtok_type_t t, const void *val, size_t val_len)
     return token;
 }
 
-static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
+static int scan_str(mjarr_t *arr, const char **cptr, mjtok_t *out)
 {
     assert(arr && *cptr && out && "Cannot be null");
 
-    char *val = *cptr;
+    const char *val = *cptr;
     size_t val_len = 0;
     int quote_count = 0;
 
@@ -197,7 +200,7 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
        is found, but here we make sure that this is true.
        If not, return an error. 
        */
-    MJ_RET_ON_TRUE(!is_quote_double(**cptr), "Invalid string");
+    MJ_RET_ERR_ON_TRUE(!is_quote_double(**cptr), "Invalid string");
 
     for ( ; *cptr && **cptr != '\0' && quote_count < 2; (*cptr)++, val_len++) {
         if (is_quote_double(**cptr)) {
@@ -206,7 +209,7 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
         }
         if (is_bslash(**cptr)) {
             (*cptr)++; val_len++;
-            MJ_RET_ON_TRUE(!(*cptr && **cptr != '\0'), "Invalid string");
+            MJ_RET_ERR_ON_TRUE(!(*cptr && **cptr != '\0'), "Invalid string");
             if (is_quote_double(**cptr) 
                 || is_bslash(**cptr)
                 || is_fslash(**cptr)
@@ -220,16 +223,16 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
             }
             if (is_hex_u(**cptr)) {
                 (*cptr)++; val_len++;
-                MJ_RET_ON_TRUE(!(*cptr && **cptr != '\0'), "Invalid string");
+                MJ_RET_ERR_ON_TRUE(!(*cptr && **cptr != '\0'), "Invalid string");
                 int hex_count = 0;
                 for ( ; *cptr && **cptr != '\0' && hex_count < 4; (*cptr)++, val_len++) {
-                    MJ_RET_ON_TRUE(!isxdigit((unsigned char) **cptr), "Invalid string");
+                    MJ_RET_ERR_ON_TRUE(!isxdigit((unsigned char) **cptr), "Invalid string");
                     hex_count++;
                 }
                 continue;
             }
         }
-        MJ_RET_ON_TRUE(!isalpha((unsigned char) **cptr), "Invalid string");
+        MJ_RET_ERR_ON_TRUE(!isalpha((unsigned char) **cptr), "Invalid string");
     } 
 
     out->type = MJTOK_STRING;
@@ -241,22 +244,22 @@ static int scan_str(mjarr_t *arr, char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
+static int scan_num(mjarr_t *arr, const char **cptr, mjtok_t *out)
 {
     assert(arr && *cptr && out && "Cannot be null");
 
-    char *val = *cptr;
+    const char *val = *cptr;
     size_t val_len = 0;
 
     /* Caller should check that first character might be 
        valid digit ranging from 0-9 or starting with '-' symbol.
        This is just a check for safety. Return -1 if not true.
        */
-    MJ_RET_ON_TRUE(!(isdigit(**cptr) || is_minus(**cptr)), "Invalid number");
+    MJ_RET_ERR_ON_TRUE(!(isdigit(**cptr) || is_minus(**cptr)), "Invalid number");
 
     if (is_minus(**cptr)) {
         (*cptr)++; val_len++;
-        MJ_RET_ON_TRUE(*cptr && !isdigit(**cptr), "Invalid number");
+        MJ_RET_ERR_ON_TRUE(*cptr && !isdigit(**cptr), "Invalid number");
     }
 
     if (isdigit(**cptr)) {
@@ -265,7 +268,7 @@ static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
         }
         if (is_dot(**cptr)) {
             (*cptr)++; val_len++;
-            MJ_RET_ON_TRUE(is_exponent(**cptr), "Invalid digit after dot");
+            MJ_RET_ERR_ON_TRUE(is_exponent(**cptr), "Invalid digit after dot");
             for ( ;*cptr && **cptr != '\0'; (*cptr)++, val_len++) {
                 if (!isdigit(**cptr)) break;
             }
@@ -299,22 +302,22 @@ static int scan_num(mjarr_t *arr, char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_bool_true(mjarr_t *arr, char **cptr, mjtok_t *out)
+static int scan_bool_true(mjarr_t *arr, const char **cptr, mjtok_t *out)
 {
     assert(arr && *cptr && out && "Cannot be null");
 
-    char *val = *cptr;
+    const char *val = *cptr;
     size_t val_len = 0;
 
     /* Caller should check first if the character is 't' before
        calling this function. This is just a check for safety.
        Return -1 if not true.
        */
-    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_TRUE(0)), "Invalid boolean");
+    MJ_RET_ERR_ON_TRUE(!(**cptr == CHAR_OF_TRUE(0)), "Invalid boolean");
 
     int next_idx = 0;
     for ( ; *cptr && **cptr != '\0' && next_idx < 4; (*cptr)++, val_len++) {
-        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_TRUE(next_idx++)), "Invalid boolean");
+        MJ_RET_ERR_ON_TRUE(!(**cptr == CHAR_OF_TRUE(next_idx++)), "Invalid boolean");
     }
 
     out->type = MJTOK_BOOL;
@@ -326,22 +329,22 @@ static int scan_bool_true(mjarr_t *arr, char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_bool_false(mjarr_t *arr, char **cptr, mjtok_t *out)
+static int scan_bool_false(mjarr_t *arr, const char **cptr, mjtok_t *out)
 {
     assert(arr && *cptr && out && "Cannot be null");
 
-    char *val = *cptr;
+    const char *val = *cptr;
     size_t val_len = 0;
 
     /* Caller should check first if the character is 'f' before
        calling this function. This is just a check for safety.
        Return -1 if not true.
        */
-    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_FALSE(0)), "Invalid boolean");
+    MJ_RET_ERR_ON_TRUE(!(**cptr == CHAR_OF_FALSE(0)), "Invalid boolean");
 
     int next_idx = 0;
     for ( ; *cptr && **cptr != '\0' && next_idx < 5; (*cptr)++, val_len++) {
-        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_FALSE(next_idx++)), "Invalid boolean");
+        MJ_RET_ERR_ON_TRUE(!(**cptr == CHAR_OF_FALSE(next_idx++)), "Invalid boolean");
     }
 
     out->type = MJTOK_BOOL;
@@ -353,22 +356,22 @@ static int scan_bool_false(mjarr_t *arr, char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_value_null(mjarr_t *arr, char **cptr, mjtok_t *out)
+static int scan_value_null(mjarr_t *arr, const char **cptr, mjtok_t *out)
 {
     assert(arr && *cptr && out && "Cannot be null");
 
-    char *val = *cptr;
+    const char *val = *cptr;
     size_t val_len = 0;
 
     /* Caller should check first if the character is 'n' before
        calling this function. This is just a check for safety.
        Return -1 if not true.
        */
-    MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(0)), "Invalid null");
+    MJ_RET_ERR_ON_TRUE(!(**cptr == CHAR_OF_NULL(0)), "Invalid null");
 
     int next_idx = 0;
     for ( ; *cptr && **cptr != '\0' && next_idx < 4; (*cptr)++, val_len++) {
-        MJ_RET_ON_TRUE(!(**cptr == CHAR_OF_NULL(next_idx++)), "Invalid null");
+        MJ_RET_ERR_ON_TRUE(!(**cptr == CHAR_OF_NULL(next_idx++)), "Invalid null");
     }
 
     out->type = MJTOK_NULL;
@@ -380,9 +383,9 @@ static int scan_value_null(mjarr_t *arr, char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int tokenize_json(mjarr_t *arr, char *const json)
+static int tokenize_json(mjarr_t *arr, const char *json)
 {
-    char *cptr = json; 
+    const char *cptr = json; 
 
     while (cptr && *cptr != '\0') {
         MJ_LOG("char: %c\n", *cptr);
@@ -469,23 +472,27 @@ typedef enum {
 } mjnode_type_t;
 
 typedef struct {
-    const void  *value;
-    size_t      len;
+    const void      *value;
+    size_t          len;
+    mjnode_type_t   type;
 } mj_str_node_t;
 
 typedef struct {
-    const void  *value;
-    size_t      len;
+    const void      *value;
+    size_t          len;
+    mjnode_type_t   type;
 } mj_num_node_t;
 
 typedef struct {
-    const void  *value;
-    size_t      len;
+    const void      *value;
+    size_t          len;
+    mjnode_type_t   type;
 } mj_bool_node_t;
 
 typedef struct {
-    void        *elems;
-    size_t      len;
+    void            *elems;
+    size_t          len;
+    mjnode_type_t   type;
 } mj_arr_node_t;
 
 typedef struct {
@@ -500,6 +507,70 @@ typedef struct {
     size_t          len;
 } mj_obj_node_t;
 
+struct myjson {
+    mj_obj_node_t *obj;
+};
+
+int myjson_parse(myjson_t *mj, const char *json)
+{
+    MJ_RET_ERR_ON_TRUE(!mj || !json, "Null pointer");
+
+    mjarr_t arr;
+    mjtok_t tok;
+
+    init_tok_arr(&arr);
+
+    MJ_RET_ON_ERR(tokenize_json(&arr, json), "Invalid json data");
+
+    for (size_t curr = 0; curr < arr.count; curr++) {
+        tok = arr.tokens[curr];
+        if (tok.type == MJTOK_BRACE_OPEN) {
+            //TODO: parse object start
+            continue;
+        }
+        if (tok.type == MJTOK_BRACE_CLOSE) {
+            //TODO: parse object end
+            continue;
+        }
+        if (tok.type == MJTOK_BRACKET_OPEN) {
+            //TODO: parse array start
+            continue;
+        }
+        if (tok.type == MJTOK_BRACKET_CLOSE) {
+            //TODO: parse array close
+            continue;
+        }
+        if (tok.type == MJTOK_STRING) {
+            //TODO: parse string
+            continue;
+        }
+        if (tok.type == MJTOK_NUMBER) {
+            //TODO: parse string
+            continue;
+        }
+        if (tok.type == MJTOK_BOOL) {
+            //TODO: parse boolean
+            continue;
+        }
+        if (tok.type == MJTOK_NULL) {
+            //TODO: parse null
+            continue;
+        }
+        if (tok.type == MJTOK_COLON) {
+            //TODO: parse colon
+            continue;
+        }
+        if (tok.type == MJTOK_COMMA) {
+            //TODO: parse comma
+            continue;
+        }
+    }
+
+    //TODO: if stack is not empty, return error: unclosed json object
+    //TODO: if root is null, return error: expected json value
+
+    return 0;
+}
 
 void test() {
     mjarr_t array;
@@ -524,10 +595,14 @@ void test() {
     //char *str = "{\"a\":\"b\", \"c\":[]}";
     //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
     char *str = R"({"a":true, "b":false, "c":null})";
-    printf("%s\n", str);
-    tokenize_json(&arr2, str);
 
+    printf("%s\n", str);
+
+    /*tokenize_json(&arr2, str);
     for (size_t i = 0; i < arr2.count; i++)
         printf("token: type=%d, value=%c, len=%zu\n",
-                arr2.tokens[i].type, *(char *) arr2.tokens[i].value, arr2.tokens[i].len);
+                arr2.tokens[i].type, *(char *) arr2.tokens[i].value, arr2.tokens[i].len);*/
+
+    myjson_t mj;
+    myjson_parse(&mj, str);
 }
