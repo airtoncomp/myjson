@@ -505,64 +505,204 @@ typedef struct {
 typedef struct {
     mj_pair_node_t  *members;
     size_t          len;
+    mjnode_type_t   type;
 } mj_obj_node_t;
 
 struct myjson {
-    mj_obj_node_t *obj;
+    void            *root;
+    mjnode_type_t   type;
 };
+
+typedef struct {
+    enum {
+        OBJ_FRAME,
+        ARR_FRAME
+    } frame_type;
+
+    enum {
+        OBJ_EXPECT_FIRST_KEY_OR_END,
+        OBJ_EXPECT_KEY,
+        OBJ_EXPECT_COLON,
+        OBJ_EXPECT_VAL,
+        OBJ_EXPECT_COMMA_OR_END,
+        ARR_EXPECT_FIRST_VAL_OR_END,
+        ARR_EXPECT_VAL,
+        ARR_EXPECT_COMMA_OR_END
+    } frame_state;
+   
+    myjson_t    *node;
+    int         state;
+    int         pending_key;
+
+} mj_frame_t;
+
+typedef struct {
+    mj_frame_t  *frames;
+    size_t      count;
+    size_t      cap;
+    int         allow_growth;
+} mj_frame_stack_t;
+
+#define MJ_FRAME_STACK_INIT_CAP         1000
+#define MJ_FRAME_STACK_GROWTH_FACTOR    2
+#define MJ_FRAME_STACK_ALLOW_GROWTH     1
+#define MJ_FRAME_STACK_DENY_GROWTH      1
+
+static void init_frame_stack(mj_frame_stack_t *stack) 
+{
+    assert(stack != NULL && "Statck cannot be null");
+
+    stack->count = 0;
+    stack->cap = MJ_FRAME_STACK_INIT_CAP;
+    stack->frames = malloc(stack->cap * sizeof(*stack->frames));
+    stack->allow_growth = MJ_FRAME_STACK_ALLOW_GROWTH;
+}
+
+static int push_frame(mj_frame_stack_t *stack, mj_frame_t frame)
+{
+    assert(stack != NULL && "Statck cannot be null");
+
+    if (stack->count >= stack->cap && stack->allow_growth) {
+        size_t new_cap = stack->cap * MJ_FRAME_STACK_GROWTH_FACTOR;
+        mj_frame_t *tmp = realloc(stack->frames, new_cap * sizeof(*stack->frames));
+        MJ_RET_ERR_ON_NULL(tmp, "Out of memory failure");
+        stack->frames = tmp;
+        stack->cap = new_cap;
+    }
+
+    stack->frames[stack->count++] = frame;
+
+    return 0;
+}
+
+static void pop_frame(mj_frame_stack_t *stack)
+{
+    if (stack->count > 0) {
+        size_t curr = stack->count - 1;
+        stack->frames[curr].node = NULL;
+        stack->frames[curr].state = -1;
+        stack->frames[curr].pending_key = -1;
+        stack->count--;
+    }
+}
+
+/*
+parse_json_iterative(tokens):
+  root = null
+  stack = empty stack
+  current = 0
+
+  while tokens[current].type != EOF:
+    token = tokens[current]
+
+    switch token.type:
+
+      case LEFT_BRACE:
+        object = new ObjectNode()
+        object.members = empty list
+        attach_value(object)
+
+        frame = new ObjectFrame()
+        frame.node = object
+        frame.state = OBJECT_EXPECT_FIRST_KEY_OR_END
+        frame.pending_key = null
+
+        stack.push(frame)
+
+      case RIGHT_BRACE:
+        end_object()
+
+      case LEFT_BRACKET:
+        array = new ArrayNode()
+        array.elements = empty list
+        attach_value(array)
+
+        frame = new ArrayFrame()
+        frame.node = array
+        frame.state = ARRAY_EXPECT_FIRST_VALUE_OR_END
+
+        stack.push(frame)
+
+      case RIGHT_BRACKET:
+        end_array()
+
+      case STRING:
+        handle_string(token)
+
+      case NUMBER:
+        node = new NumberNode(token.value)
+        attach_value(node)
+
+      case TRUE:
+        node = new BooleanNode(true)
+        attach_value(node)
+
+      case FALSE:
+        node = new BooleanNode(false)
+        attach_value(node)
+
+      case NULL:
+        node = new NullNode()
+        attach_value(node)
+
+      case COLON:
+        handle_colon()
+
+      case COMMA:
+        handle_comma()
+
+      default:
+        error("Unexpected token")
+
+    current = current + 1
+
+  if stack is not empty:
+    error("Unclosed JSON structure")
+
+  if root is null:
+    error("Expected JSON value")
+
+  return root
+*/
 
 int myjson_parse(myjson_t *mj, const char *json)
 {
     MJ_RET_ERR_ON_TRUE(!mj || !json, "Null pointer");
 
-    mjarr_t arr;
-    mjtok_t tok;
+    mj->root = NULL;
+
+    mj_frame_stack_t stack;
+    init_frame_stack(&stack);
 
     init_tok_arr(&arr);
-
     MJ_RET_ON_ERR(tokenize_json(&arr, json), "Invalid json data");
 
     for (size_t curr = 0; curr < arr.count; curr++) {
-        tok = arr.tokens[curr];
-        if (tok.type == MJTOK_BRACE_OPEN) {
-            //TODO: parse object start
-            continue;
-        }
-        if (tok.type == MJTOK_BRACE_CLOSE) {
-            //TODO: parse object end
-            continue;
-        }
-        if (tok.type == MJTOK_BRACKET_OPEN) {
-            //TODO: parse array start
-            continue;
-        }
-        if (tok.type == MJTOK_BRACKET_CLOSE) {
-            //TODO: parse array close
-            continue;
-        }
-        if (tok.type == MJTOK_STRING) {
-            //TODO: parse string
-            continue;
-        }
-        if (tok.type == MJTOK_NUMBER) {
-            //TODO: parse string
-            continue;
-        }
-        if (tok.type == MJTOK_BOOL) {
-            //TODO: parse boolean
-            continue;
-        }
-        if (tok.type == MJTOK_NULL) {
-            //TODO: parse null
-            continue;
-        }
-        if (tok.type == MJTOK_COLON) {
-            //TODO: parse colon
-            continue;
-        }
-        if (tok.type == MJTOK_COMMA) {
-            //TODO: parse comma
-            continue;
+        mjtok_t tok = arr.tokens[curr];
+        switch (tok.type) {
+        case MJTOK_BRACE_OPEN:
+            break;
+        case MJTOK_BRACE_CLOSE:
+            break;
+        case MJTOK_BRACKET_OPEN:
+            break;
+        case MJTOK_BRACKET_CLOSE:
+            break;
+        case MJTOK_STRING:
+            break;
+        case MJTOK_NUMBER:
+            break;
+        case MJTOK_BOOL:
+            break;
+        case MJTOK_NULL:
+            break;
+        case MJTOK_COLON:
+            break;
+        case MJTOK_COMMA:
+            break;
+        default:
+            MJ_LOGE("Unexpected token");
+            return -1;
         }
     }
 
