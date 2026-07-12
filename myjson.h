@@ -24,6 +24,11 @@
 
 #include <string.h>
 
+/**
+ * Public JSON value type exposed by the library.
+ * Users should refer to this type through the myjson_t
+ * typedef when parsing and working with JSON data.
+ */
 typedef struct myjson myjson_t;
 
 /**
