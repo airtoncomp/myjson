@@ -462,56 +462,66 @@ advance:
  */
 
 typedef enum {
-    OBJECT_NODE,
-    PAIR_NODE,
-    ARRAY_NODE,
-    STRING_NODE,
-    NUMBER_NODE,
-    BOOL_NODE,
-    NULL_NODE
+    MJ_NODE_OBJECT,
+    MJ_NODE_PAIR,
+    MJ_NODE_ARRAY,
+    MJ_NODE_STRING,
+    MJ_NODE_NUMBER,
+    MJ_NODE_BOOL,
+    MJ_NODE_NULL
 } mjnode_type_t;
 
 typedef struct {
     const void      *value;
     size_t          len;
-    mjnode_type_t   type;
 } mj_str_node_t;
 
 typedef struct {
     const void      *value;
     size_t          len;
-    mjnode_type_t   type;
 } mj_num_node_t;
 
 typedef struct {
     const void      *value;
     size_t          len;
-    mjnode_type_t   type;
 } mj_bool_node_t;
 
 typedef struct {
     void            *elems;
     size_t          len;
-    mjnode_type_t   type;
 } mj_arr_node_t;
 
 typedef struct {
     const void      *key;
     const void      *value;
     size_t          key_len;
-    mjnode_type_t   val_type;
 } mj_pair_node_t;
 
 typedef struct {
-    mj_pair_node_t  *members;
+    const void      *members;
+    const void      *value;
     size_t          len;
-    mjnode_type_t   type;
 } mj_obj_node_t;
 
-struct myjson {
-    void            *root;
+/**
+ * The field 'node' is of type mj_node_t, but such node is generic.
+ * Casting depends on 'type'.
+ */
+typedef struct {
+    void            *node;
     mjnode_type_t   type;
+} mj_node_t;
+
+/**
+ * This is the type that is exposed to the user of library.
+ * However, this is typedefed to myjson_t by myjson.h file.
+ */
+struct myjson {
+    mj_node_t root;
 };
+
+#define mj_frame_type(x)    x.frame_type
+#define mj_frame_state(x)   x.frame_state
 
 typedef struct {
     enum {
@@ -530,9 +540,10 @@ typedef struct {
         ARR_EXPECT_COMMA_OR_END
     } frame_state;
    
-    myjson_t    *node;
+    int         type;
     int         state;
-    int         pending_key;
+    mj_node_t   *node;
+    mj_node_t   *pending_key;
 
 } mj_frame_t;
 
@@ -579,91 +590,48 @@ static void pop_frame(mj_frame_stack_t *stack)
 {
     if (stack->count > 0) {
         size_t curr = stack->count - 1;
-        stack->frames[curr].node = NULL;
+        stack->frames[curr].type = -1;
         stack->frames[curr].state = -1;
-        stack->frames[curr].pending_key = -1;
+        stack->frames[curr].node = NULL;
+        stack->frames[curr].pending_key = NULL;
         stack->count--;
     }
 }
 
-/*
-parse_json_iterative(tokens):
-  root = null
-  stack = empty stack
-  current = 0
+static inline int is_frame_stack_empty(const mj_frame_stack_t *stack)
+{
+    assert(stack != NULL && "Null pointer");
+    return stack->count == 0;
+}
 
-  while tokens[current].type != EOF:
-    token = tokens[current]
+static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *root)
+{
+    if (is_frame_stack_empty(stack)) {
+        MJ_RET_ERR_ON_NULL(!root->node, "Json data cannot have multiple root");
+        root->node = node;
+        root->type = MJ_NODE_OBJECT; 
+        return;
+    }
+}
 
-    switch token.type:
+static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t *root,
+                              const void *val, size_t val_len)
+{
+    mj_obj_node_t *node = malloc(sizeof(*node));
+    node->members = NULL;
+    node->value = val;
+    node->len = val_len;
 
-      case LEFT_BRACE:
-        object = new ObjectNode()
-        object.members = empty list
-        attach_value(object)
+    attach_node(stack, node, root);
 
-        frame = new ObjectFrame()
-        frame.node = object
-        frame.state = OBJECT_EXPECT_FIRST_KEY_OR_END
-        frame.pending_key = null
+    mj_frame_t frame = malloc(sizeof(*frame));
+    frame->type = mj_frame_type(frame).OBJ_FRAME;
+    frame->node = node;
+    frame->state = mj_frame_state(frame).OBJECT_EXPECT_FIRST_KEY_OR_END;
+    frame->pending_key = NULL;
 
-        stack.push(frame)
-
-      case RIGHT_BRACE:
-        end_object()
-
-      case LEFT_BRACKET:
-        array = new ArrayNode()
-        array.elements = empty list
-        attach_value(array)
-
-        frame = new ArrayFrame()
-        frame.node = array
-        frame.state = ARRAY_EXPECT_FIRST_VALUE_OR_END
-
-        stack.push(frame)
-
-      case RIGHT_BRACKET:
-        end_array()
-
-      case STRING:
-        handle_string(token)
-
-      case NUMBER:
-        node = new NumberNode(token.value)
-        attach_value(node)
-
-      case TRUE:
-        node = new BooleanNode(true)
-        attach_value(node)
-
-      case FALSE:
-        node = new BooleanNode(false)
-        attach_value(node)
-
-      case NULL:
-        node = new NullNode()
-        attach_value(node)
-
-      case COLON:
-        handle_colon()
-
-      case COMMA:
-        handle_comma()
-
-      default:
-        error("Unexpected token")
-
-    current = current + 1
-
-  if stack is not empty:
-    error("Unclosed JSON structure")
-
-  if root is null:
-    error("Expected JSON value")
-
-  return root
-*/
+    push_frame(stack, frame);
+}
 
 int myjson_parse(myjson_t *mj, const char *json)
 {
@@ -681,6 +649,8 @@ int myjson_parse(myjson_t *mj, const char *json)
         mjtok_t tok = arr.tokens[curr];
         switch (tok.type) {
         case MJTOK_BRACE_OPEN:
+            MJ_RET_ON_ERR(mj_parse_obj_start(&stack, &mj.root, tok.value, tok.len),
+                          "Failed to parse json object");
             break;
         case MJTOK_BRACE_CLOSE:
             break;
