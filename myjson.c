@@ -630,6 +630,22 @@ static inline int is_frame_stack_empty(const mj_frame_stack_t *stack)
     return stack->count == 0;
 }
 
+static mj_str_node_t *alloc_str_node(const char *val, size_t val_len)
+{
+    mj_str_node_t *str_node = malloc(sizeof(*str_node));
+    str_node->value = val;
+    str_node->len = val_len;
+    return str_node;
+}
+
+static mj_node_t *alloc_node(void *child, mjnode_type_t type)
+{
+    mj_node_t *node = malloc(sizeof(*node));
+    node->node = child;
+    node->type = type;
+    return node;
+}
+
 static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *root)
 {
     if (is_frame_stack_empty(stack)) {
@@ -729,6 +745,62 @@ static void mj_parse_obj_end(mj_frame_stack_t *stack)
         fprintf(stderr, "Expected value after ':'\n");
 }
 
+static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t *root, const char *val, size_t val_len)
+{
+    mj_str_node_t *str_node = alloc_str_node(val, val_len);
+    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+
+    if (is_frame_stack_empty(stack)) {
+        attach_node(stack, node, root);
+        return;
+    }
+
+    mj_frame_t frame = mj_frame_stack_top(stack);
+    
+    if (mj_frame_type(frame) == OBJ_FRAME) {
+        if (mj_frame_state(frame) == OBJ_EXPECT_FIRST_KEY_OR_END) {
+            frame.pending_key = node;
+            frame.frame_state = OBJ_EXPECT_COLON;
+            return;
+        }
+        if (mj_frame_state(frame) == OBJ_EXPECT_KEY) {
+            frame.pending_key = node;
+            frame.frame_state = OBJ_EXPECT_KEY;
+            return;
+        }
+        if (mj_frame_state(frame) == OBJ_EXPECT_VAL) {
+            attach_node(stack, node, root);
+            return;
+        }
+        fprintf(stderr, "Unexpected string in object");
+    }
+
+    if (mj_frame_type(frame) == ARR_FRAME) {
+        attach_node(stack, node, root);
+        return;
+    }
+    
+    fprintf(stderr, "Failed to parse string\n");
+
+    free(str_node);
+}
+
+void mj_parse_colon(mj_frame_stack_t *stack)
+{
+    if (is_frame_stack_empty(stack))
+        fprintf(stderr, "Unexpected ':' outside object\n");
+
+    mj_frame_t frame = mj_frame_stack_top(stack);
+
+    if (mj_frame_type(frame) != OBJ_FRAME)
+        fprintf(stderr, "Unexpected ':' inside array\n");
+
+    if (mj_frame_state(frame) != OBJ_EXPECT_COLON)
+        fprintf(stderr, "Unexpected ':' in object\n");
+
+    frame.frame_state = OBJ_EXPECT_VAL;
+}
+
 int myjson_parse(myjson_t *mj, const char *json)
 {
     MJ_RET_ERR_ON_TRUE(!mj || !json, "Null pointer");
@@ -757,6 +829,7 @@ int myjson_parse(myjson_t *mj, const char *json)
         case MJTOK_BRACKET_CLOSE:
             break;
         case MJTOK_STRING:
+            mj_parse_str(&stack, mj->root, tok.value, tok.len);
             break;
         case MJTOK_NUMBER:
             break;
@@ -765,6 +838,7 @@ int myjson_parse(myjson_t *mj, const char *json)
         case MJTOK_NULL:
             break;
         case MJTOK_COLON:
+            mj_parse_colon(&stack);
             break;
         case MJTOK_COMMA:
             break;
