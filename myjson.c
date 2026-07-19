@@ -605,8 +605,8 @@ static inline int is_frame_stack_empty(const mj_frame_stack_t *stack)
 static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *root)
 {
     if (is_frame_stack_empty(stack)) {
-        if (!root->node) {
-            MJ_LOGE("Json data cannot have multiple root");
+        if (root->node) {
+            fprintf(stderr, "Unexpected extra json value after root\n");
             return;
         }
         root->node = node;
@@ -619,7 +619,7 @@ static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *roo
     if (mj_frame_type(frame) == ARR_FRAME) {
         if (mj_frame_state(frame) != ARR_EXPECT_FIRST_VAL_OR_END &&
             mj_frame_state(frame) != ARR_EXPECT_VAL) {
-            MJ_LOGE("Unexpected value in array");
+            fprintf(stderr, "Unexpected value in array\n");
         }
 
         mj_arr_node_t *arr_node = frame.node->node;
@@ -633,7 +633,7 @@ static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *roo
 
     if (mj_frame_type(frame) == OBJ_FRAME) {
         if (mj_frame_state(frame) != OBJ_EXPECT_VAL) {
-            MJ_LOGE("Unexpected value in object");
+            fprintf(stderr, "Unexpected value in object\n");
         }
 
         mj_pair_node_t *pair_node = malloc(sizeof(*pair_node));
@@ -673,6 +673,36 @@ static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t *root)
     push_frame(stack, frame);
 }
 
+static void mj_parse_obj_end(mj_frame_stack_t *stack)
+{
+    if (is_frame_stack_empty(stack)) 
+        fprintf(stderr, "Unexpected brace '}'\n");
+    
+    mj_frame_t frame = mj_frame_stack_top(stack);
+
+    if (mj_frame_type(frame) != OBJ_FRAME)
+        fprintf(stderr, "Unexpected brace '}' while parssing array\n");
+
+    if (mj_frame_state(frame) == OBJ_EXPECT_FIRST_KEY_OR_END) {
+        pop_frame(stack);
+        return;
+    }
+
+    if (mj_frame_state(frame) == OBJ_EXPECT_COMMA_OR_END) {
+        pop_frame(stack);
+        return;
+    }
+
+    if (mj_frame_state(frame) == OBJ_EXPECT_KEY)
+        fprintf(stderr, "Expected object key after ','\n");
+
+    if (mj_frame_state(frame) == OBJ_EXPECT_COLON)
+        fprintf(stderr, "Expected ':' after object key\n");
+
+    if (mj_frame_state(frame) == OBJ_EXPECT_VAL)
+        fprintf(stderr, "Expected value after ':'\n");
+}
+
 int myjson_parse(myjson_t *mj, const char *json)
 {
     MJ_RET_ERR_ON_TRUE(!mj || !json, "Null pointer");
@@ -693,6 +723,7 @@ int myjson_parse(myjson_t *mj, const char *json)
             mj_parse_obj_start(&stack, &mj->root);
             break;
         case MJTOK_BRACE_CLOSE:
+            mj_parse_obj_end(&stack);
             break;
         case MJTOK_BRACKET_OPEN:
             break;
