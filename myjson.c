@@ -471,6 +471,15 @@ typedef enum {
     MJ_NODE_NULL
 } mjnode_type_t;
 
+/**
+ * The field 'node' is of type mj_node_t, but such node is generic.
+ * Casting depends on 'type'.
+ */
+typedef struct {
+    void            *node;
+    mjnode_type_t   type;
+} mj_node_t;
+
 typedef struct {
     const void      *value;
     size_t          len;
@@ -487,30 +496,20 @@ typedef struct {
 } mj_bool_node_t;
 
 typedef struct {
-    void            *elems;
-    size_t          len;
+    mj_node_t       *elems;
+    size_t          count;
 } mj_arr_node_t;
 
 typedef struct {
     const void      *key;
     const void      *value;
-    size_t          key_len;
 } mj_pair_node_t;
 
 typedef struct {
-    const void      *members;
-    const void      *value;
-    size_t          len;
+    mj_node_t       *members;
+    size_t          count;
 } mj_obj_node_t;
 
-/**
- * The field 'node' is of type mj_node_t, but such node is generic.
- * Casting depends on 'type'.
- */
-typedef struct {
-    void            *node;
-    mjnode_type_t   type;
-} mj_node_t;
 
 /**
  * This is the type that is exposed to the user of library.
@@ -520,8 +519,9 @@ struct myjson {
     mj_node_t root;
 };
 
-#define mj_frame_type(x)    x.frame_type
-#define mj_frame_state(x)   x.frame_state
+#define mj_frame_type(x)        x.frame_type
+#define mj_frame_state(x)       x.frame_state
+#define mj_frame_stack_top(x)   x->frames[x->count - 1]
 
 typedef struct {
     enum {
@@ -540,8 +540,6 @@ typedef struct {
         ARR_EXPECT_COMMA_OR_END
     } frame_state;
    
-    int         type;
-    int         state;
     mj_node_t   *node;
     mj_node_t   *pending_key;
 
@@ -590,9 +588,9 @@ static void pop_frame(mj_frame_stack_t *stack)
 {
     if (stack->count > 0) {
         size_t curr = stack->count - 1;
-        stack->frames[curr].type = -1;
-        stack->frames[curr].state = -1;
+        free(stack->frames[curr].node);
         stack->frames[curr].node = NULL;
+        free(stack->frames[curr].pending_key);
         stack->frames[curr].pending_key = NULL;
         stack->count--;
     }
@@ -607,28 +605,70 @@ static inline int is_frame_stack_empty(const mj_frame_stack_t *stack)
 static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *root)
 {
     if (is_frame_stack_empty(stack)) {
-        MJ_RET_ERR_ON_NULL(!root->node, "Json data cannot have multiple root");
+        if (!root->node) {
+            MJ_LOGE("Json data cannot have multiple root");
+            return;
+        }
         root->node = node;
         root->type = MJ_NODE_OBJECT; 
         return;
     }
+
+    mj_frame_t frame = mj_frame_stack_top(stack);
+
+    if (mj_frame_type(frame) == ARR_FRAME) {
+        if (mj_frame_state(frame) != ARR_EXPECT_FIRST_VAL_OR_END &&
+            mj_frame_state(frame) != ARR_EXPECT_VAL) {
+            MJ_LOGE("Unexpected value in array");
+        }
+
+        mj_arr_node_t *arr_node = frame.node->node;
+        arr_node->elems[arr_node->count].node = node;
+        arr_node->count++;
+
+        frame.frame_state = ARR_EXPECT_FIRST_VAL_OR_END;
+
+        return;
+    }
+
+    if (mj_frame_type(frame) == OBJ_FRAME) {
+        if (mj_frame_state(frame) != OBJ_EXPECT_VAL) {
+            MJ_LOGE("Unexpected value in object");
+        }
+
+        mj_pair_node_t *pair_node = malloc(sizeof(*pair_node));
+        pair_node->key = frame.pending_key;
+        pair_node->value = node;
+        
+        mj_obj_node_t *obj_node = frame.node->node;
+        obj_node->members[obj_node->count].node = pair_node;
+        obj_node->count++;
+
+        frame.pending_key = NULL;
+        frame.frame_state = OBJ_EXPECT_COMMA_OR_END;
+
+        return;
+    }
 }
 
-static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t *root,
-                              const void *val, size_t val_len)
+static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t *root)
 {
-    mj_obj_node_t *node = malloc(sizeof(*node));
-    node->members = NULL;
-    node->value = val;
-    node->len = val_len;
+    mj_node_t *node = malloc(sizeof(*node));
+    node->type = MJ_NODE_OBJECT;
+
+    mj_obj_node_t *obj = malloc(sizeof(*obj));
+    obj->members = NULL;
+    obj->count = 0;
+
+    node->node = obj;
 
     attach_node(stack, node, root);
 
-    mj_frame_t frame = malloc(sizeof(*frame));
-    frame->type = mj_frame_type(frame).OBJ_FRAME;
-    frame->node = node;
-    frame->state = mj_frame_state(frame).OBJECT_EXPECT_FIRST_KEY_OR_END;
-    frame->pending_key = NULL;
+    mj_frame_t frame;
+    frame.node = node;
+    frame.frame_type = OBJ_FRAME;
+    frame.frame_state = OBJ_EXPECT_FIRST_KEY_OR_END;
+    frame.pending_key = NULL;
 
     push_frame(stack, frame);
 }
@@ -637,11 +677,12 @@ int myjson_parse(myjson_t *mj, const char *json)
 {
     MJ_RET_ERR_ON_TRUE(!mj || !json, "Null pointer");
 
-    mj->root = NULL;
+    mj->root.node = NULL;
 
     mj_frame_stack_t stack;
     init_frame_stack(&stack);
 
+    mjarr_t arr;
     init_tok_arr(&arr);
     MJ_RET_ON_ERR(tokenize_json(&arr, json), "Invalid json data");
 
@@ -649,8 +690,7 @@ int myjson_parse(myjson_t *mj, const char *json)
         mjtok_t tok = arr.tokens[curr];
         switch (tok.type) {
         case MJTOK_BRACE_OPEN:
-            MJ_RET_ON_ERR(mj_parse_obj_start(&stack, &mj.root, tok.value, tok.len),
-                          "Failed to parse json object");
+            mj_parse_obj_start(&stack, &mj->root);
             break;
         case MJTOK_BRACE_CLOSE:
             break;
