@@ -546,7 +546,7 @@ typedef struct {
  * However, this is typedefed to myjson_t by myjson.h file.
  */
 struct myjson {
-    mj_node_t root;
+    mj_node_t *root;
 };
 
 #define mj_frame_type(x)        x.frame_type
@@ -618,9 +618,7 @@ static void pop_frame(mj_frame_stack_t *stack)
 {
     if (stack->count > 0) {
         size_t curr = stack->count - 1;
-        free(stack->frames[curr].node);
         stack->frames[curr].node = NULL;
-        free(stack->frames[curr].pending_key);
         stack->frames[curr].pending_key = NULL;
         stack->count--;
     }
@@ -635,12 +633,10 @@ static inline int is_frame_stack_empty(const mj_frame_stack_t *stack)
 static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *root)
 {
     if (is_frame_stack_empty(stack)) {
-        if (root->node) {
+        if (root) {
             fprintf(stderr, "Unexpected extra json value after root\n");
-            return;
         }
-        root->node = node;
-        root->type = MJ_NODE_OBJECT; 
+        root = node;
         return;
     }
 
@@ -737,7 +733,8 @@ int myjson_parse(myjson_t *mj, const char *json)
 {
     MJ_RET_ERR_ON_TRUE(!mj || !json, "Null pointer");
 
-    mj->root.node = NULL;
+    /* Root node of json tree */
+    mj->root = NULL;
 
     mj_frame_stack_t stack;
     init_frame_stack(&stack);
@@ -750,7 +747,7 @@ int myjson_parse(myjson_t *mj, const char *json)
         mjtok_t tok = arr.tokens[curr];
         switch (tok.type) {
         case MJTOK_BRACE_OPEN:
-            mj_parse_obj_start(&stack, &mj->root);
+            mj_parse_obj_start(&stack, mj->root);
             break;
         case MJTOK_BRACE_CLOSE:
             mj_parse_obj_end(&stack);
@@ -772,7 +769,7 @@ int myjson_parse(myjson_t *mj, const char *json)
         case MJTOK_COMMA:
             break;
         default:
-            MJ_LOGE("Unexpected token");
+            fprintf(stderr, "Unexpected token");
             return -1;
         }
     }
