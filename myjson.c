@@ -237,7 +237,7 @@ static int scan_str(mjarr_t *arr, const char **cptr, mjtok_t *out)
 
     out->type = MJTOK_STRING;
     out->value = val;
-    out->len = ++val_len;
+    out->len = val_len;
 
     /* The loop finishes by advancing to the next character,
        but there is the outer loop that still advances (where
@@ -245,7 +245,7 @@ static int scan_str(mjarr_t *arr, const char **cptr, mjtok_t *out)
        exactly where the character '"' is.*/
     (*cptr)--;
     
-    MJ_LOG_STR("string: %s\n", val, val_len);
+    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
