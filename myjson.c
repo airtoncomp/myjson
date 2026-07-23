@@ -301,7 +301,7 @@ static int scan_num(mjarr_t *arr, const char **cptr, mjtok_t *out)
 
     out->type = MJTOK_NUMBER;
     out->value = val;
-    out->len = ++val_len;
+    out->len = val_len;
 
     /* The loop finishes by advancing to the next character,
        but there is the outer loop that still advances (where
@@ -309,7 +309,7 @@ static int scan_num(mjarr_t *arr, const char **cptr, mjtok_t *out)
        exactly where the last digit is.*/
     (*cptr)--;
 
-    MJ_LOG_STR("string: %s\n", val, val_len);
+    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
@@ -994,9 +994,29 @@ int myjson_parse(myjson_t *mj, const char *json)
 }
 
 /**
- * JSON Printer
+ * MyJSON Printer
  */
 
+static void mj_print_bool_node(mj_bool_node_t *node);
+static void mj_print_null_node(mj_null_node_t *node);
+static void mj_print_str_node(const char *s, size_t slen);
+static void mj_print_obj_node(const mj_obj_node_t *node);
+static void mj_print_pair_node(const mj_pair_node_t *node);
+static void mj_print_node(const mj_node_t *node);
+
+static void mj_print_null_node(mj_null_node_t *node)
+{
+    if (strncmp(node->value, "null", node->len) == 0)
+        printf("null");
+}
+
+static void mj_print_bool_node(mj_bool_node_t *node)
+{
+    if (strncmp(node->value, "true", node->len) == 0)
+        printf("true");
+    else
+        printf("false");
+}
 
 static void mj_print_str_node(const char *s, size_t slen)
 {
@@ -1038,16 +1058,6 @@ static void mj_print_str_node(const char *s, size_t slen)
     printf("\"");
 }
 
-static void mj_print_pair_node(const mj_pair_node_t *node)
-{
-    mj_print_str_node(node->key, node->keylen);
-
-    printf(":");
-
-    const mj_str_node_t *snv = node->value;
-    mj_print_str_node(snv->value, snv->len);
-}
-
 static void mj_print_obj_node(const mj_obj_node_t *node)
 {
     printf("{");
@@ -1063,6 +1073,15 @@ static void mj_print_obj_node(const mj_obj_node_t *node)
     printf("}");
 }
 
+static void mj_print_pair_node(const mj_pair_node_t *node)
+{
+    mj_print_str_node(node->key, node->keylen);
+
+    printf(":");
+
+    mj_print_node(node->value);
+}
+
 static void mj_print_node(const mj_node_t *node)
 {
     switch(node->type) {
@@ -1071,13 +1090,18 @@ static void mj_print_node(const mj_node_t *node)
         break;
     case MJ_NODE_ARRAY:
         break;
-    case MJ_NODE_STRING:
+    case MJ_NODE_STRING: {
+        mj_str_node_t *str_node = node->node;
+        mj_print_str_node(str_node->value, str_node->len);
         break;
+    }
     case MJ_NODE_NUMBER:
         break;
     case MJ_NODE_BOOL:
+        mj_print_bool_node(node->node);
         break;
     case MJ_NODE_NULL:
+        mj_print_null_node(node->node);
         break;
     default:
         fprintf(stderr, "Unknown json character");
