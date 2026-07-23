@@ -334,7 +334,7 @@ static int scan_bool_true(mjarr_t *arr, const char **cptr, mjtok_t *out)
 
     out->type = MJTOK_BOOL;
     out->value = val;
-    out->len = ++val_len;
+    out->len = val_len;
 
     /* The loop finishes by advancing to the next character,
        but there is the outer loop that still advances (where
@@ -342,7 +342,7 @@ static int scan_bool_true(mjarr_t *arr, const char **cptr, mjtok_t *out)
        exactly where the character 'e' is.*/
     (*cptr)--;
 
-    MJ_LOG_STR("string: %s\n", val, val_len);
+    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
@@ -367,7 +367,7 @@ static int scan_bool_false(mjarr_t *arr, const char **cptr, mjtok_t *out)
 
     out->type = MJTOK_BOOL;
     out->value = val;
-    out->len = ++val_len;
+    out->len = val_len;
 
     /* The loop finishes by advancing to the next character,
        but there is the outer loop that still advances (where
@@ -375,7 +375,7 @@ static int scan_bool_false(mjarr_t *arr, const char **cptr, mjtok_t *out)
        exactly where the character 'e' is.*/
     (*cptr)--;
 
-    MJ_LOG_STR("string: %s\n", val, val_len);
+    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
@@ -400,7 +400,7 @@ static int scan_value_null(mjarr_t *arr, const char **cptr, mjtok_t *out)
 
     out->type = MJTOK_NULL;
     out->value = val;
-    out->len = ++val_len;
+    out->len = val_len;
 
     /* The loop finishes by advancing to the next character,
        but there is the outer loop that still advances (where
@@ -408,7 +408,7 @@ static int scan_value_null(mjarr_t *arr, const char **cptr, mjtok_t *out)
        exactly where the character 'l' is.*/
     (*cptr)--;
 
-    MJ_LOG_STR("string: %s\n", val, val_len);
+    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
