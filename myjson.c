@@ -549,7 +549,8 @@ typedef struct {
 } mj_arr_node_t;
 
 typedef struct {
-    const void      *key;
+    const char      *key;
+    size_t          keylen;
     const void      *value;
 } mj_pair_node_t;
 
@@ -588,7 +589,8 @@ typedef struct {
     } frame_state;
    
     mj_node_t   *node;
-    mj_node_t   *pending_key;
+    const char  *pending_key;
+    size_t      pending_keylen;
 
 } mj_frame_t;
 
@@ -637,6 +639,7 @@ static void pop_frame(mj_frame_stack_t *stack)
         size_t curr = stack->count - 1;
         stack->frames[curr].node = NULL;
         stack->frames[curr].pending_key = NULL;
+        stack->frames[curr].pending_keylen = 0;
         stack->count--;
     }
 }
@@ -704,10 +707,11 @@ static mj_obj_node_t *alloc_obj_node(size_t cap)
     return obj_node;
 }
 
-static mj_pair_node_t *alloc_pair_node(mj_node_t *key, mj_node_t *val)
+static mj_pair_node_t *alloc_pair_node(const char *key, size_t keylen, mj_node_t *val)
 {
     mj_pair_node_t *pair_node = malloc(sizeof(*pair_node));
     pair_node->key = key;
+    pair_node->keylen = keylen;
     pair_node->value = val;
     return pair_node;
 }
@@ -755,13 +759,14 @@ static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **ro
             return;
         }
 
-        mj_pair_node_t *pair_node = alloc_pair_node(frame->pending_key, node);
+        mj_pair_node_t *pair_node = alloc_pair_node(frame->pending_key, frame->pending_keylen, node);
         mj_node_t *new_node = alloc_node(pair_node, MJ_NODE_PAIR);
 
         mj_obj_node_t *obj_node = frame->node->node;
         append_mj_node(&obj_node->members, new_node);
 
         frame->pending_key = NULL;
+        frame->pending_keylen = 0;
         frame->frame_state = OBJ_EXPECT_COMMA_OR_END;
 
         return;
@@ -780,6 +785,7 @@ static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
     frame.frame_type = OBJ_FRAME;
     frame.frame_state = OBJ_EXPECT_FIRST_KEY_OR_END;
     frame.pending_key = NULL;
+    frame.pending_keylen = 0;
 
     push_frame(stack, frame);
 }
@@ -836,12 +842,14 @@ static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *
     
     if (mj_frame_type(frame) == OBJ_FRAME) {
         if (mj_frame_state(frame) == OBJ_EXPECT_FIRST_KEY_OR_END) {
-            frame->pending_key = node;
+            frame->pending_key = val;
+            frame->pending_keylen = val_len;
             frame->frame_state = OBJ_EXPECT_COLON;
             return;
         }
         if (mj_frame_state(frame) == OBJ_EXPECT_KEY) {
-            frame->pending_key = node;
+            frame->pending_key = val;
+            frame->pending_keylen = val_len;
             frame->frame_state = OBJ_EXPECT_COLON;
             return;
         }
@@ -990,41 +998,41 @@ int myjson_parse(myjson_t *mj, const char *json)
  */
 
 
-static void mj_print_str_node(const char *const *s, size_t slen)
+static void mj_print_str_node(const char *s, size_t slen)
 {
     printf("\"");
 
     for (size_t i = 0; i < slen; i++) {
-        if (is_quote_double(*s[i])) {
+        if (is_quote_double(s[i])) {
             printf("\\\"");
             continue;
         }
-        if (is_bslash(*s[i])) {
+        if (is_bslash(s[i])) {
             printf("\\\\");
             continue;
         }
-        if (is_linefeed_n(*s[i])) {
+        if (is_linefeed_n(s[i])) {
             printf("\\n");
             continue;
         }
-        if (is_carret_r(*s[i])) {
+        if (is_carret_r(s[i])) {
             printf("\\r");
             continue;
         }
-        if (is_tab_t(*s[i])) {
+        if (is_tab_t(s[i])) {
             printf("\\t");
             continue;
         }
-        if (is_backspc_b(*s[i])) {
+        if (is_backspc_b(s[i])) {
             printf("\\b");
             continue;
         }
-        if (is_formfeed_f(*s[i])) {
+        if (is_formfeed_f(s[i])) {
             printf("\\f");
             continue;
         }
         //TODO: print unicode escape
-        printf("%c", *s[i]);
+        printf("%c", s[i]);
     }
 
     printf("\"");
@@ -1032,13 +1040,12 @@ static void mj_print_str_node(const char *const *s, size_t slen)
 
 static void mj_print_pair_node(const mj_pair_node_t *node)
 {
-    const mj_str_node_t *snk = node->key;
-    mj_print_str_node(&snk->value, snk->len);
+    mj_print_str_node(node->key, node->keylen);
 
     printf(":");
 
     const mj_str_node_t *snv = node->value;
-    mj_print_str_node(&snv->value, snv->len);
+    mj_print_str_node(snv->value, snv->len);
 }
 
 static void mj_print_obj_node(const mj_obj_node_t *node)
