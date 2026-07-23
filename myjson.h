@@ -38,5 +38,6 @@ typedef struct myjson myjson_t;
  */
 
 int myjson_parse(myjson_t *mj, const char *json);
+void myjson_print(const myjson_t *mj);
 
 #endif

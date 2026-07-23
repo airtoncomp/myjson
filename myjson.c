@@ -524,22 +524,22 @@ typedef struct {
 } mj_node_arr_t;
 
 typedef struct {
-    const void      *value;
+    const char      *value;
     size_t          len;
 } mj_str_node_t;
 
 typedef struct {
-    const void      *value;
+    const char      *value;
     size_t          len;
 } mj_num_node_t;
 
 typedef struct {
-    const void      *value;
+    const char      *value;
     size_t          len;
 } mj_bool_node_t;
 
 typedef struct {
-    const void      *value;
+    const char      *value;
     size_t          len;
 } mj_null_node_t;
 
@@ -850,17 +850,19 @@ static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *
             return;
         }
         fprintf(stderr, "Unexpected string in object\n");
-        return;
+        goto err;
     }
 
     if (mj_frame_type(frame) == ARR_FRAME) {
         attach_node(stack, node, root);
         return;
     }
-    
+
+err:
     fprintf(stderr, "Failed to parse string\n");
 
     free(str_node);
+    free(node);
 }
 
 static void mj_parse_colon(mj_frame_stack_t *stack)
@@ -983,6 +985,107 @@ int myjson_parse(myjson_t *mj, const char *json)
     return 0;
 }
 
+/**
+ * JSON Printer
+ */
+
+
+static void mj_print_str_node(const char *const *s, size_t slen)
+{
+    printf("\"");
+
+    for (size_t i = 0; i < slen; i++) {
+        if (is_quote_double(*s[i])) {
+            printf("\\\"");
+            continue;
+        }
+        if (is_bslash(*s[i])) {
+            printf("\\\\");
+            continue;
+        }
+        if (is_linefeed_n(*s[i])) {
+            printf("\\n");
+            continue;
+        }
+        if (is_carret_r(*s[i])) {
+            printf("\\r");
+            continue;
+        }
+        if (is_tab_t(*s[i])) {
+            printf("\\t");
+            continue;
+        }
+        if (is_backspc_b(*s[i])) {
+            printf("\\b");
+            continue;
+        }
+        if (is_formfeed_f(*s[i])) {
+            printf("\\f");
+            continue;
+        }
+        //TODO: print unicode escape
+        printf("%c", *s[i]);
+    }
+
+    printf("\"");
+}
+
+static void mj_print_pair_node(const mj_pair_node_t *node)
+{
+    const mj_str_node_t *snk = node->key;
+    mj_print_str_node(&snk->value, snk->len);
+
+    printf(":");
+
+    const mj_str_node_t *snv = node->value;
+    mj_print_str_node(&snv->value, snv->len);
+}
+
+static void mj_print_obj_node(const mj_obj_node_t *node)
+{
+    printf("{");
+
+    for (size_t i = 0; i < node->members.count - 1; i++) {
+        const mj_pair_node_t *pair_node = node->members.arr[i]->node;
+        mj_print_pair_node(pair_node);
+
+        if (i + 1 < node->members.count)
+            printf(",");
+    }
+
+    printf("}");
+}
+
+static void mj_print_node(const mj_node_t *node)
+{
+    switch(node->type) {
+    case MJ_NODE_OBJECT:
+        mj_print_obj_node(node->node);
+        break;
+    case MJ_NODE_ARRAY:
+        break;
+    case MJ_NODE_STRING:
+        break;
+    case MJ_NODE_NUMBER:
+        break;
+    case MJ_NODE_BOOL:
+        break;
+    case MJ_NODE_NULL:
+        break;
+    default:
+        fprintf(stderr, "Unknown json character");
+    }
+}
+
+void myjson_print(const myjson_t *mj)
+{
+    if (!mj || !mj->root) {
+        fprintf(stderr, "Cannot print null json root");
+        return;
+    }
+    mj_print_node(mj->root);
+}
+
 void test() {
     mjarr_t array;
     init_tok_arr(&array);
@@ -1005,7 +1108,8 @@ void test() {
     //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
     //char *str = "{\"a\":\"b\", \"c\":[]}";
     //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
-    char *str = R"({"a":true, "b":false, "c":null})";
+    //char *str = R"({"a":true, "b":false, "c":null})";
+    char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
 
     printf("%s\n", str);
 
@@ -1016,4 +1120,5 @@ void test() {
 
     myjson_t mj;
     myjson_parse(&mj, str);
+    myjson_print(&mj);
 }
