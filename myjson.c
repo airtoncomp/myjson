@@ -596,7 +596,7 @@ typedef struct {
     mj_frame_t  *frames;
     size_t      count;
     size_t      cap;
-    int         allow_growth;
+    int         allow_growth; //TODO
 } mj_frame_stack_t;
 
 #define MJ_FRAME_STACK_INIT_CAP         1000
@@ -720,13 +720,14 @@ static mj_node_t *alloc_node(void *child, mjnode_type_t type)
     return node;
 }
 
-static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *root)
+static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **root)
 {
     if (is_frame_stack_empty(stack)) {
-        if (root) {
+        if (*root) {
             fprintf(stderr, "Unexpected extra json value after root\n");
+            return;
         }
-        root = node;
+        *root = node;
         return;
     }
 
@@ -767,7 +768,7 @@ static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t *roo
     }
 }
 
-static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t *root)
+static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
 {
     mj_obj_node_t *obj_node = alloc_obj_node(MJ_NODE_ARRAY_INIT_CAP);
     mj_node_t *node = alloc_node(obj_node, MJ_NODE_OBJECT);
@@ -821,7 +822,7 @@ static void mj_parse_obj_end(mj_frame_stack_t *stack)
         fprintf(stderr, "Expected value after ':'\n");
 }
 
-static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t *root, const char *val, size_t val_len)
+static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
     mj_str_node_t *str_node = alloc_str_node(val, val_len);
     mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
@@ -884,14 +885,14 @@ static void mj_parse_colon(mj_frame_stack_t *stack)
     frame->frame_state = OBJ_EXPECT_VAL;
 }
 
-static void mj_parse_bool(mj_frame_stack_t *stack, mj_node_t *root, const char *val, size_t val_len)
+static void mj_parse_bool(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
     mj_bool_node_t *bool_node = alloc_bool_node(val, val_len);
     mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
     attach_node(stack, node, root);
 }
 
-static void mj_parse_null(mj_frame_stack_t *stack, mj_node_t *root, const char *val, size_t val_len)
+static void mj_parse_null(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
     mj_null_node_t *null_node = alloc_null_node(val, val_len);
     mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
@@ -909,7 +910,7 @@ static void mj_parse_comma(mj_frame_stack_t *stack)
 
     if (mj_frame_type(frame) == OBJ_FRAME) {
         if (mj_frame_state(frame) != OBJ_EXPECT_COMMA_OR_END) {
-            fprintf(stderr, "Unexpected ',' in object");
+            fprintf(stderr, "Unexpected ',' in object\n");
             return;
         }
         frame->frame_state = OBJ_EXPECT_KEY;
@@ -918,7 +919,7 @@ static void mj_parse_comma(mj_frame_stack_t *stack)
 
     if (mj_frame_type(frame) == ARR_FRAME) {
         if (mj_frame_state(frame) != ARR_EXPECT_COMMA_OR_END) {
-            fprintf(stderr, "Unexpected ',' in array");
+            fprintf(stderr, "Unexpected ',' in array\n");
             return;
         }
         frame->frame_state = ARR_EXPECT_VAL;
@@ -944,7 +945,7 @@ int myjson_parse(myjson_t *mj, const char *json)
         mjtok_t tok = arr.tokens[curr];
         switch (tok.type) {
         case MJTOK_BRACE_OPEN:
-            mj_parse_obj_start(&stack, mj->root);
+            mj_parse_obj_start(&stack, &mj->root);
             break;
         case MJTOK_BRACE_CLOSE:
             mj_parse_obj_end(&stack);
@@ -954,15 +955,15 @@ int myjson_parse(myjson_t *mj, const char *json)
         case MJTOK_BRACKET_CLOSE:
             break;
         case MJTOK_STRING:
-            mj_parse_str(&stack, mj->root, tok.value, tok.len);
+            mj_parse_str(&stack, &mj->root, tok.value, tok.len);
             break;
         case MJTOK_NUMBER:
             break;
         case MJTOK_BOOL:
-            mj_parse_bool(&stack, mj->root, tok.value, tok.len);
+            mj_parse_bool(&stack, &mj->root, tok.value, tok.len);
             break;
         case MJTOK_NULL:
-            mj_parse_null(&stack, mj->root, tok.value, tok.len);
+            mj_parse_null(&stack, &mj->root, tok.value, tok.len);
             break;
         case MJTOK_COLON:
             mj_parse_colon(&stack);
@@ -971,13 +972,13 @@ int myjson_parse(myjson_t *mj, const char *json)
             mj_parse_comma(&stack);
             break;
         default:
-            fprintf(stderr, "Unexpected token");
+            fprintf(stderr, "Unexpected token\n");
             return -1;
         }
     }
 
-    //TODO: if stack is not empty, return error: unclosed json object
-    //TODO: if root is null, return error: expected json value
+    MJ_RET_ERR_ON_TRUE(!is_frame_stack_empty(&stack), "Unclosed json structure");
+    MJ_RET_ERR_ON_NULL(mj->root, "Expected json value");
 
     return 0;
 }
