@@ -1045,7 +1045,7 @@ static void mj_print_obj_node(const mj_obj_node_t *node)
 {
     printf("{");
 
-    for (size_t i = 0; i < node->members.count - 1; i++) {
+    for (size_t i = 0; i < node->members.count; i++) {
         const mj_pair_node_t *pair_node = node->members.arr[i]->node;
         mj_print_pair_node(pair_node);
 
