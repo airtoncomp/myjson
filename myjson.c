@@ -160,6 +160,12 @@ static void init_tok_arr(mjarr_t *arr)
     arr->tokens = malloc(arr->cap * sizeof(*arr->tokens));
 }
 
+static void free_tok_arr(mjarr_t *arr) 
+{
+    assert(arr != NULL && "Array cannot be null");
+    free(arr->tokens);
+}
+
 static int append_tok(mjarr_t *arr, mjtok_t token)
 {
     assert(arr != NULL && "Array cannot be null");
@@ -551,7 +557,7 @@ typedef struct {
 typedef struct {
     const char      *key;
     size_t          keylen;
-    const void      *value;
+    void            *value;
 } mj_pair_node_t;
 
 typedef struct {
@@ -604,7 +610,6 @@ typedef struct {
 #define MJ_FRAME_STACK_INIT_CAP         1000
 #define MJ_FRAME_STACK_GROWTH_FACTOR    2
 #define MJ_FRAME_STACK_ALLOW_GROWTH     1
-#define MJ_FRAME_STACK_DENY_GROWTH      1
 
 static void init_frame_stack(mj_frame_stack_t *stack) 
 {
@@ -987,10 +992,120 @@ int myjson_parse(myjson_t *mj, const char *json)
         }
     }
 
-    MJ_RET_ERR_ON_TRUE(!is_frame_stack_empty(&stack), "Unclosed json structure");
+    free_tok_arr(&arr);
+
+    if (!is_frame_stack_empty(&stack)) {
+        fprintf(stderr, "Unclosed json structure\n");
+        free(stack.frames);
+        return -1;
+    }
+
+    free(stack.frames);
+
     MJ_RET_ERR_ON_NULL(mj->root, "Expected json value");
 
     return 0;
+}
+
+/**
+ * MyJSON free memory
+ */
+
+static void mj_free_obj_node(mj_obj_node_t *node);
+static void mj_free_pair_node(mj_pair_node_t *node);
+static void mj_free_str_node(mj_str_node_t *node);
+static void mj_free_bool_node(mj_bool_node_t *node);
+static void mj_free_null_node(mj_null_node_t *node);
+static void mj_free_node(mj_node_t *node);
+
+static void mj_free_obj_node(mj_obj_node_t *node)
+{
+    for (size_t i = 0; i < node->members.count; i++) {
+        mj_pair_node_t *pair_node = node->members.arr[i]->node;
+        mj_free_pair_node(pair_node);
+        free(node->members.arr[i]);
+    }
+    for (size_t i = node->members.count; i < node->members.cap; i++) {
+        free(node->members.arr[i]);
+    }
+    free(node->members.arr);
+    node->members.arr = NULL;
+    node->members.count = 0;
+}
+
+static void mj_free_pair_node(mj_pair_node_t *node)
+{
+    node->key = NULL;
+    node->keylen = 0;
+    mj_free_node(node->value);
+    free(node);
+}
+
+static void mj_free_str_node(mj_str_node_t *node)
+{
+    if (node) {
+        node->value = NULL;
+        node->len = 0;
+        free(node);
+    }
+}
+
+static void mj_free_bool_node(mj_bool_node_t *node)
+{
+    if (node) {
+        node->value = NULL;
+        node->len = 0;
+        free(node);
+    }
+}
+
+static void mj_free_null_node(mj_null_node_t *node)
+{
+    if (node) {
+        node->value = NULL;
+        node->len = 0;
+        free(node);
+    }
+}
+
+static void mj_free_node(mj_node_t *node)
+{
+    switch(node->type) {
+    case MJ_NODE_OBJECT:
+        mj_free_obj_node(node->node);
+        free(node);
+        break;
+    case MJ_NODE_ARRAY:
+        break;
+    case MJ_NODE_STRING: {
+        mj_str_node_t *str_node = node->node;
+        mj_free_str_node(str_node);
+        free(node);
+        break;
+    }
+    case MJ_NODE_NUMBER:
+        break;
+    case MJ_NODE_BOOL:
+        mj_free_bool_node(node->node);
+        free(node);
+        break;
+    case MJ_NODE_NULL:
+        mj_free_null_node(node->node);
+        free(node);
+        break;
+    default:
+        fprintf(stderr, "Unknown json type");
+    }
+}
+
+void myjson_free(myjson_t *mj)
+{
+    if (!mj || !mj->root) {
+        fprintf(stderr, "Cannot free null json root");
+        return;
+    }
+    mj_free_node(mj->root);
+    mj->root = NULL;
 }
 
 /**
@@ -1104,7 +1219,7 @@ static void mj_print_node(const mj_node_t *node)
         mj_print_null_node(node->node);
         break;
     default:
-        fprintf(stderr, "Unknown json character");
+        fprintf(stderr, "Unknown json type");
     }
 }
 
@@ -1118,7 +1233,7 @@ void myjson_print(const myjson_t *mj)
 }
 
 void test() {
-    mjarr_t array;
+    /*mjarr_t array;
     init_tok_arr(&array);
     mjtok_t token = {
         .type = MJTOK_STRING,
@@ -1132,15 +1247,17 @@ void test() {
         .value = "b",
         .len = 1
     };
-    append_tok(&array, token2);
+    append_tok(&array, token2);*/
 
-    mjarr_t arr2; 
-    init_tok_arr(&arr2);
+    //mjarr_t arr2; 
+    //init_tok_arr(&arr2);
     //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
     //char *str = "{\"a\":\"b\", \"c\":[]}";
     //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
     //char *str = R"({"a":true, "b":false, "c":null})";
-    char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
+    //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
+    //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
+    char *str = R"({"a":true})";
 
     printf("%s\n", str);
 
@@ -1152,4 +1269,5 @@ void test() {
     myjson_t mj;
     myjson_parse(&mj, str);
     myjson_print(&mj);
+    myjson_free(&mj);
 }
