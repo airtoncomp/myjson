@@ -611,6 +611,113 @@ typedef struct {
 #define MJ_FRAME_STACK_GROWTH_FACTOR    2
 #define MJ_FRAME_STACK_ALLOW_GROWTH     1
 
+/**
+ * MyJSON free memory
+ */
+
+static void mj_free_obj_node(mj_obj_node_t *node);
+static void mj_free_pair_node(mj_pair_node_t *node);
+static void mj_free_str_node(mj_str_node_t *node);
+static void mj_free_bool_node(mj_bool_node_t *node);
+static void mj_free_null_node(mj_null_node_t *node);
+static void mj_free_node(mj_node_t *node);
+
+static void mj_free_obj_node(mj_obj_node_t *node)
+{
+    for (size_t i = 0; i < node->members.cap; i++) {
+        if (node->members.arr[i]) {
+            if (node->members.arr[i]->node) {
+                mj_pair_node_t *pair_node = node->members.arr[i]->node;
+                mj_free_pair_node(pair_node);
+            }
+            free(node->members.arr[i]);
+        }
+    }
+    free(node->members.arr);
+    node->members.arr = NULL;
+    node->members.count = 0;
+    free(node);
+}
+
+static void mj_free_pair_node(mj_pair_node_t *node)
+{
+    node->key = NULL;
+    node->keylen = 0;
+    mj_free_node(node->value);
+    free(node);
+}
+
+static void mj_free_str_node(mj_str_node_t *node)
+{
+    if (node) {
+        node->value = NULL;
+        node->len = 0;
+        free(node);
+    }
+}
+
+static void mj_free_bool_node(mj_bool_node_t *node)
+{
+    if (node) {
+        node->value = NULL;
+        node->len = 0;
+        free(node);
+    }
+}
+
+static void mj_free_null_node(mj_null_node_t *node)
+{
+    if (node) {
+        node->value = NULL;
+        node->len = 0;
+        free(node);
+    }
+}
+
+static void mj_free_node(mj_node_t *node)
+{
+    switch(node->type) {
+    case MJ_NODE_OBJECT:
+        mj_free_obj_node(node->node);
+        free(node);
+        break;
+    case MJ_NODE_ARRAY:
+        break;
+    case MJ_NODE_STRING: {
+        mj_str_node_t *str_node = node->node;
+        mj_free_str_node(str_node);
+        free(node);
+        break;
+    }
+    case MJ_NODE_NUMBER:
+        break;
+    case MJ_NODE_BOOL:
+        mj_free_bool_node(node->node);
+        free(node);
+        break;
+    case MJ_NODE_NULL:
+        mj_free_null_node(node->node);
+        free(node);
+        break;
+    default:
+        fprintf(stderr, "Unknown json type");
+    }
+}
+
+void myjson_free(myjson_t *mj)
+{
+    if (!mj || !mj->root) {
+        fprintf(stderr, "Cannot free null json root");
+        return;
+    }
+    mj_free_node(mj->root);
+    mj->root = NULL;
+}
+
+/**
+ * MyJSON node allocator
+ */
+
 static void init_frame_stack(mj_frame_stack_t *stack) 
 {
     assert(stack != NULL && "Statck cannot be null");
@@ -659,7 +766,7 @@ static void init_mj_node_arr(mj_node_arr_t *arr, size_t cap)
 {
     assert(arr != NULL && "Array cannot be null");
 
-    arr->arr = malloc(cap * sizeof(arr->arr));
+    arr->arr = calloc(cap, sizeof(arr->arr));
     arr->count = 0;
     arr->cap = cap;
 }
@@ -729,15 +836,15 @@ static mj_node_t *alloc_node(void *child, mjnode_type_t type)
     return node;
 }
 
-static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **root)
+static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **root)
 {
     if (is_frame_stack_empty(stack)) {
         if (*root) {
             fprintf(stderr, "Unexpected extra json value after root\n");
-            return;
+            return -1;
         }
         *root = node;
-        return;
+        return 0;
     }
 
     mj_frame_t *frame = &mj_frame_stack_top(stack);
@@ -746,7 +853,7 @@ static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **ro
         if (mj_frame_state(frame) != ARR_EXPECT_FIRST_VAL_OR_END &&
             mj_frame_state(frame) != ARR_EXPECT_VAL) {
             fprintf(stderr, "Unexpected value in array\n");
-            return;
+            return -1;
         }
 
         mj_arr_node_t *arr_node = frame->node->node;
@@ -755,13 +862,13 @@ static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **ro
 
         frame->frame_state = ARR_EXPECT_FIRST_VAL_OR_END;
 
-        return;
+        return 0;
     }
 
     if (mj_frame_type(frame) == OBJ_FRAME) {
         if (mj_frame_state(frame) != OBJ_EXPECT_VAL) {
             fprintf(stderr, "Unexpected value in object\n");
-            return;
+            return -1;
         }
 
         mj_pair_node_t *pair_node = alloc_pair_node(frame->pending_key, frame->pending_keylen, node);
@@ -773,9 +880,9 @@ static void attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **ro
         frame->pending_key = NULL;
         frame->pending_keylen = 0;
         frame->frame_state = OBJ_EXPECT_COMMA_OR_END;
-
-        return;
     }
+
+    return 0;
 }
 
 static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
@@ -783,7 +890,11 @@ static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
     mj_obj_node_t *obj_node = alloc_obj_node(MJ_NODE_ARRAY_INIT_CAP);
     mj_node_t *node = alloc_node(obj_node, MJ_NODE_OBJECT);
 
-    attach_node(stack, node, root);
+    if (attach_node(stack, node, root) < 0) {
+        mj_free_obj_node(obj_node);
+        free(node);
+        return;
+    }
 
     mj_frame_t frame;
     frame.node = node;
@@ -792,7 +903,10 @@ static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
     frame.pending_key = NULL;
     frame.pending_keylen = 0;
 
-    push_frame(stack, frame);
+    if (push_frame(stack, frame) < 0) {
+        mj_free_obj_node(obj_node);
+        free(node);
+    }
 }
 
 static void mj_parse_obj_end(mj_frame_stack_t *stack)
@@ -835,10 +949,9 @@ static void mj_parse_obj_end(mj_frame_stack_t *stack)
 
 static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
-    mj_str_node_t *str_node = alloc_str_node(val, val_len);
-    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
-
     if (is_frame_stack_empty(stack)) {
+        mj_str_node_t *str_node = alloc_str_node(val, val_len);
+        mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
         attach_node(stack, node, root);
         return;
     }
@@ -859,23 +972,20 @@ static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *
             return;
         }
         if (mj_frame_state(frame) == OBJ_EXPECT_VAL) {
+            mj_str_node_t *str_node = alloc_str_node(val, val_len);
+            mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
             attach_node(stack, node, root);
             return;
         }
         fprintf(stderr, "Unexpected string in object\n");
-        goto err;
-    }
-
-    if (mj_frame_type(frame) == ARR_FRAME) {
-        attach_node(stack, node, root);
         return;
     }
 
-err:
-    fprintf(stderr, "Failed to parse string\n");
-
-    free(str_node);
-    free(node);
+    if (mj_frame_type(frame) == ARR_FRAME) {
+        mj_str_node_t *str_node = alloc_str_node(val, val_len);
+        mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+        attach_node(stack, node, root);
+    }
 }
 
 static void mj_parse_colon(mj_frame_stack_t *stack)
@@ -1005,107 +1115,6 @@ int myjson_parse(myjson_t *mj, const char *json)
     MJ_RET_ERR_ON_NULL(mj->root, "Expected json value");
 
     return 0;
-}
-
-/**
- * MyJSON free memory
- */
-
-static void mj_free_obj_node(mj_obj_node_t *node);
-static void mj_free_pair_node(mj_pair_node_t *node);
-static void mj_free_str_node(mj_str_node_t *node);
-static void mj_free_bool_node(mj_bool_node_t *node);
-static void mj_free_null_node(mj_null_node_t *node);
-static void mj_free_node(mj_node_t *node);
-
-static void mj_free_obj_node(mj_obj_node_t *node)
-{
-    for (size_t i = 0; i < node->members.count; i++) {
-        mj_pair_node_t *pair_node = node->members.arr[i]->node;
-        mj_free_pair_node(pair_node);
-        free(node->members.arr[i]);
-    }
-    for (size_t i = node->members.count; i < node->members.cap; i++) {
-        free(node->members.arr[i]);
-    }
-    free(node->members.arr);
-    node->members.arr = NULL;
-    node->members.count = 0;
-}
-
-static void mj_free_pair_node(mj_pair_node_t *node)
-{
-    node->key = NULL;
-    node->keylen = 0;
-    mj_free_node(node->value);
-    free(node);
-}
-
-static void mj_free_str_node(mj_str_node_t *node)
-{
-    if (node) {
-        node->value = NULL;
-        node->len = 0;
-        free(node);
-    }
-}
-
-static void mj_free_bool_node(mj_bool_node_t *node)
-{
-    if (node) {
-        node->value = NULL;
-        node->len = 0;
-        free(node);
-    }
-}
-
-static void mj_free_null_node(mj_null_node_t *node)
-{
-    if (node) {
-        node->value = NULL;
-        node->len = 0;
-        free(node);
-    }
-}
-
-static void mj_free_node(mj_node_t *node)
-{
-    switch(node->type) {
-    case MJ_NODE_OBJECT:
-        mj_free_obj_node(node->node);
-        free(node);
-        break;
-    case MJ_NODE_ARRAY:
-        break;
-    case MJ_NODE_STRING: {
-        mj_str_node_t *str_node = node->node;
-        mj_free_str_node(str_node);
-        free(node);
-        break;
-    }
-    case MJ_NODE_NUMBER:
-        break;
-    case MJ_NODE_BOOL:
-        mj_free_bool_node(node->node);
-        free(node);
-        break;
-    case MJ_NODE_NULL:
-        mj_free_null_node(node->node);
-        free(node);
-        break;
-    default:
-        fprintf(stderr, "Unknown json type");
-    }
-}
-
-void myjson_free(myjson_t *mj)
-{
-    if (!mj || !mj->root) {
-        fprintf(stderr, "Cannot free null json root");
-        return;
-    }
-    mj_free_node(mj->root);
-    mj->root = NULL;
 }
 
 /**
