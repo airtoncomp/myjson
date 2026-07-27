@@ -37,7 +37,9 @@ typedef struct myjson myjson_t;
  * json data and make call to functions that use this type.
  */
 
+myjson_t *myjson_create();
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);
+void myjson_free(myjson_t *mj);
 
 #endif
