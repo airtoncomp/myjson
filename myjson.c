@@ -712,6 +712,7 @@ void myjson_free(myjson_t *mj)
     }
     mj_free_node(mj->root);
     mj->root = NULL;
+    free(mj);
 }
 
 /**
@@ -835,6 +836,15 @@ static mj_node_t *alloc_node(void *child, mjnode_type_t type)
     node->type = type;
     return node;
 }
+
+inline myjson_t *myjson_create()
+{
+    return malloc(sizeof(myjson_t));
+}
+
+/**
+ * MyJSON parser into nodes
+ */
 
 static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **root)
 {
@@ -1241,42 +1251,3 @@ void myjson_print(const myjson_t *mj)
     mj_print_node(mj->root);
 }
 
-void test() {
-    /*mjarr_t array;
-    init_tok_arr(&array);
-    mjtok_t token = {
-        .type = MJTOK_STRING,
-        .value = "a",
-        .len = 1
-    };
-    append_tok(&array, token);
-
-    mjtok_t token2 = {
-        .type = MJTOK_STRING,
-        .value = "b",
-        .len = 1
-    };
-    append_tok(&array, token2);*/
-
-    //mjarr_t arr2; 
-    //init_tok_arr(&arr2);
-    //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
-    //char *str = "{\"a\":\"b\", \"c\":[]}";
-    //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
-    //char *str = R"({"a":true, "b":false, "c":null})";
-    //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
-    //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
-    char *str = R"({"a":true})";
-
-    printf("%s\n", str);
-
-    /*tokenize_json(&arr2, str);
-    for (size_t i = 0; i < arr2.count; i++)
-        printf("token: type=%d, value=%c, len=%zu\n",
-                arr2.tokens[i].type, *(char *) arr2.tokens[i].value, arr2.tokens[i].len);*/
-
-    myjson_t mj;
-    myjson_parse(&mj, str);
-    myjson_print(&mj);
-    myjson_free(&mj);
-}
