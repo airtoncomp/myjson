@@ -441,11 +441,11 @@ static int tokenize_json(mjarr_t *arr, const char *json)
             goto advance;
         }
         if (is_bracket_open(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_OPEN, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACKET_OPEN, cptr, 1)));
             goto advance;
         }
         if (is_bracket_close(*cptr)) {
-            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACE_CLOSE, cptr, 1)));
+            MJ_RET_ON_ERR2(append_tok(arr, new_tok(MJTOK_BRACKET_CLOSE, cptr, 1)));
             goto advance;
         }
         if (is_comma(*cptr)) {
@@ -516,7 +516,7 @@ typedef struct {
     mjnode_type_t   type;
 } mj_node_t;
 
-#define MJ_NODE_ARRAY_INIT_CAP        100
+#define MJ_ARRAY_NODE_INIT_CAP        100
 #define MJ_NODE_ARRAY_GROWTH_FACTOR   2
 
 /**
@@ -527,7 +527,7 @@ typedef struct {
     size_t          count;
     size_t          cap;
     int             allow_growth;
-} mj_node_arr_t;
+} mj_arr_node_t;
 
 typedef struct {
     const char      *value;
@@ -550,18 +550,13 @@ typedef struct {
 } mj_null_node_t;
 
 typedef struct {
-    mj_node_t       *elems;
-    size_t          count;
-} mj_arr_node_t;
-
-typedef struct {
     const char      *key;
     size_t          keylen;
     void            *value;
 } mj_pair_node_t;
 
 typedef struct {
-    mj_node_arr_t   members;
+    mj_arr_node_t   members;
 } mj_obj_node_t;
 
 
@@ -616,6 +611,7 @@ typedef struct {
  */
 
 static void mj_free_obj_node(mj_obj_node_t *node);
+static void mj_free_arr_node(mj_arr_node_t *node);
 static void mj_free_pair_node(mj_pair_node_t *node);
 static void mj_free_str_node(mj_str_node_t *node);
 static void mj_free_bool_node(mj_bool_node_t *node);
@@ -636,6 +632,26 @@ static void mj_free_obj_node(mj_obj_node_t *node)
     free(node->members.arr);
     node->members.arr = NULL;
     node->members.count = 0;
+    free(node);
+}
+
+static void mj_free_arr_node(mj_arr_node_t *node)
+{
+    for (size_t i = 0; i < node->cap; i++) {
+        if (node->arr[i]) {
+            if (node->arr[i]->node) {
+                if (node->arr[i]->type == MJ_NODE_PAIR) {
+                    mj_pair_node_t *pair_node = node->arr[i]->node;
+                    mj_free_pair_node(pair_node);
+                    continue;
+                }
+            }
+            free(node->arr[i]);
+        }
+    }
+    free(node->arr);
+    node->arr = NULL;
+    node->count = 0;
     free(node);
 }
 
@@ -682,6 +698,7 @@ static void mj_free_node(mj_node_t *node)
         free(node);
         break;
     case MJ_NODE_ARRAY:
+        mj_free_arr_node(node->node);
         break;
     case MJ_NODE_STRING: {
         mj_str_node_t *str_node = node->node;
@@ -763,7 +780,7 @@ static inline int is_frame_stack_empty(const mj_frame_stack_t *stack)
     return stack->count == 0;
 }
 
-static void init_mj_node_arr(mj_node_arr_t *arr, size_t cap) 
+static void init_mj_arr_node(mj_arr_node_t *arr, size_t cap) 
 {
     assert(arr != NULL && "Array cannot be null");
 
@@ -772,7 +789,7 @@ static void init_mj_node_arr(mj_node_arr_t *arr, size_t cap)
     arr->cap = cap;
 }
 
-static int append_mj_node(mj_node_arr_t *arr, mj_node_t *node)
+static int append_mj_node(mj_arr_node_t *arr, mj_node_t *node)
 {
     assert(arr != NULL && "Array cannot be null");
 
@@ -816,8 +833,15 @@ static mj_null_node_t *alloc_null_node(const char *val, size_t val_len)
 static mj_obj_node_t *alloc_obj_node(size_t cap)
 {
     mj_obj_node_t *obj_node = malloc(sizeof(*obj_node));
-    init_mj_node_arr(&obj_node->members, cap);
+    init_mj_arr_node(&obj_node->members, cap);
     return obj_node;
+}
+
+static mj_arr_node_t *alloc_arr_node(size_t cap)
+{
+    mj_arr_node_t *arr_node = malloc(sizeof(*arr_node));
+    init_mj_arr_node(arr_node, cap);
+    return arr_node;
 }
 
 static mj_pair_node_t *alloc_pair_node(const char *key, size_t keylen, mj_node_t *val)
@@ -867,7 +891,7 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
         }
 
         mj_arr_node_t *arr_node = frame->node->node;
-        arr_node->elems[arr_node->count].node = node;
+        arr_node->arr[arr_node->count]->node = node;
         arr_node->count++;
 
         frame->frame_state = ARR_EXPECT_FIRST_VAL_OR_END;
@@ -897,7 +921,7 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
 
 static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
 {
-    mj_obj_node_t *obj_node = alloc_obj_node(MJ_NODE_ARRAY_INIT_CAP);
+    mj_obj_node_t *obj_node = alloc_obj_node(MJ_ARRAY_NODE_INIT_CAP);
     mj_node_t *node = alloc_node(obj_node, MJ_NODE_OBJECT);
 
     if (attach_node(stack, node, root) < 0) {
@@ -1007,6 +1031,11 @@ static void mj_parse_colon(mj_frame_stack_t *stack)
 
     mj_frame_t *frame = &mj_frame_stack_top(stack);
 
+    if (mj_frame_type(frame) == ARR_FRAME) {
+        fprintf(stderr, "Unexpected ':' inside array\n");
+        return;
+    }
+
     if (mj_frame_type(frame) != OBJ_FRAME) {
         fprintf(stderr, "Unexpected ':' inside array\n");
         return;
@@ -1062,6 +1091,56 @@ static void mj_parse_comma(mj_frame_stack_t *stack)
     }
 }
 
+static void mj_parse_arr_start(mj_frame_stack_t *stack, mj_node_t **root)
+{
+    mj_arr_node_t *arr_node = alloc_arr_node(MJ_ARRAY_NODE_INIT_CAP);
+    mj_node_t *node = alloc_node(arr_node, MJ_NODE_OBJECT);
+
+    if (attach_node(stack, node, root) < 0) {
+        mj_free_arr_node(arr_node);
+        free(node);
+        return;
+    }
+
+    mj_frame_t frame;
+    frame.node = node;
+    frame.frame_type = ARR_FRAME;
+    frame.frame_state = ARR_EXPECT_FIRST_VAL_OR_END;
+
+    if (push_frame(stack, frame) < 0) {
+        mj_free_arr_node(arr_node);
+        free(node);
+    }
+}
+
+static void mj_parse_arr_end(mj_frame_stack_t *stack)
+{
+    if (is_frame_stack_empty(stack)) {
+        fprintf(stderr, "Unexpected bracket ']'\n");
+        return;
+    }
+    
+    mj_frame_t *frame = &mj_frame_stack_top(stack);
+
+    if (mj_frame_type(frame) != ARR_FRAME) {
+        fprintf(stderr, "Unexpected bracket ']' while parsing object\n");
+        return;
+    }
+
+    if (mj_frame_state(frame) == ARR_EXPECT_FIRST_VAL_OR_END) {
+        pop_frame(stack);
+        return;
+    }
+
+    if (mj_frame_state(frame) == ARR_EXPECT_COMMA_OR_END) {
+        pop_frame(stack);
+        return;
+    }
+
+    if (mj_frame_state(frame) == ARR_EXPECT_VAL)
+        fprintf(stderr, "Expected array value after ','\n");
+}
+
 int myjson_parse(myjson_t *mj, const char *json)
 {
     MJ_RET_ERR_ON_TRUE(!mj || !json, "Null pointer");
@@ -1086,13 +1165,16 @@ int myjson_parse(myjson_t *mj, const char *json)
             mj_parse_obj_end(&stack);
             break;
         case MJTOK_BRACKET_OPEN:
+            mj_parse_arr_start(&stack, &mj->root);
             break;
         case MJTOK_BRACKET_CLOSE:
+            mj_parse_arr_end(&stack);
             break;
         case MJTOK_STRING:
             mj_parse_str(&stack, &mj->root, tok.value, tok.len);
             break;
         case MJTOK_NUMBER:
+            //TODO:
             break;
         case MJTOK_BOOL:
             mj_parse_bool(&stack, &mj->root, tok.value, tok.len);
@@ -1135,6 +1217,7 @@ static void mj_print_bool_node(mj_bool_node_t *node);
 static void mj_print_null_node(mj_null_node_t *node);
 static void mj_print_str_node(const char *s, size_t slen);
 static void mj_print_obj_node(const mj_obj_node_t *node);
+static void mj_print_arr_node(const mj_arr_node_t *node);
 static void mj_print_pair_node(const mj_pair_node_t *node);
 static void mj_print_node(const mj_node_t *node);
 
@@ -1207,6 +1290,20 @@ static void mj_print_obj_node(const mj_obj_node_t *node)
     printf("}");
 }
 
+static void mj_print_arr_node(const mj_arr_node_t *node)
+{
+    printf("[");
+
+    for (size_t i = 0; i < node->count; i++) {
+        mj_print_node(node->arr[i]);
+
+        if (i + 1 < node->count)
+            printf(",");
+    }
+
+    printf("]");
+}
+
 static void mj_print_pair_node(const mj_pair_node_t *node)
 {
     mj_print_str_node(node->key, node->keylen);
@@ -1223,6 +1320,7 @@ static void mj_print_node(const mj_node_t *node)
         mj_print_obj_node(node->node);
         break;
     case MJ_NODE_ARRAY:
+        mj_print_arr_node(node->node);
         break;
     case MJ_NODE_STRING: {
         mj_str_node_t *str_node = node->node;
