@@ -18,7 +18,8 @@ void test() {
     //char *str = R"({"a":true})";
     //char *str = R"({"a":[true]})";
     //char *str = R"({"a":[{"b":"c"},{"d":true}, "elem"]})";
-    char *str = R"(["a",true])";
+    //char *str = R"(["a",true])";
+    char *str = R"({"a":2})";
 
     printf("%s\n", str);
 
