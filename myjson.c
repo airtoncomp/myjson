@@ -1225,27 +1225,27 @@ int myjson_parse(myjson_t *mj, const char *json)
  * MyJSON Printer
  */
 
-static void mj_print_num_node(mj_num_node_t *node);
-static void mj_print_bool_node(mj_bool_node_t *node);
-static void mj_print_null_node(mj_null_node_t *node);
+static void mj_print_num_node(const mj_num_node_t *node);
+static void mj_print_bool_node(const mj_bool_node_t *node);
+static void mj_print_null_node(const mj_null_node_t *node);
 static void mj_print_str_node(const char *s, size_t slen);
 static void mj_print_obj_node(const mj_obj_node_t *node);
 static void mj_print_arr_node(const mj_arr_node_t *node);
 static void mj_print_pair_node(const mj_pair_node_t *node);
 static void mj_print_node(const mj_node_t *node);
 
-static void mj_print_num_node(mj_num_node_t *node)
+static void mj_print_num_node(const mj_num_node_t *node)
 {
     printf("%*s", (int) node->len, node->value);
 }
 
-static void mj_print_null_node(mj_null_node_t *node)
+static void mj_print_null_node(const mj_null_node_t *node)
 {
     if (strncmp(node->value, "null", node->len) == 0)
         printf("null");
 }
 
-static void mj_print_bool_node(mj_bool_node_t *node)
+static void mj_print_bool_node(const mj_bool_node_t *node)
 {
     if (strncmp(node->value, "true", node->len) == 0)
         printf("true");
