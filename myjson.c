@@ -639,16 +639,14 @@ static void mj_free_obj_node(mj_obj_node_t *node)
 static void mj_free_arr_node(mj_arr_node_t *node)
 {
     for (size_t i = 0; i < node->cap; i++) {
-        if (node->arr[i]) {
-            if (node->arr[i]->node) {
-                if (node->arr[i]->type == MJ_NODE_PAIR) {
-                    mj_pair_node_t *pair_node = node->arr[i]->node;
-                    mj_free_pair_node(pair_node);
-                    continue;
-                }
+        if (node->arr[i] && node->arr[i]->node) {
+            if (node->arr[i]->type == MJ_NODE_PAIR) {
+                mj_pair_node_t *pair_node = node->arr[i]->node;
+                mj_free_pair_node(pair_node);
+                continue;
             }
-            free(node->arr[i]);
         }
+        free(node->arr[i]);
     }
     free(node->arr);
     node->arr = NULL;
