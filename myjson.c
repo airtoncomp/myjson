@@ -25,8 +25,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <assert.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "myjson.h"
 
@@ -194,9 +194,9 @@ static inline mjtok_t new_tok(mjtok_type_t t, const void *val, size_t val_len)
     return token;
 }
 
-static int scan_str(mjarr_t *arr, const char **cptr, mjtok_t *out)
+static int scan_str(const char **cptr, mjtok_t *out)
 {
-    assert(arr && *cptr && out && "Cannot be null");
+    assert(*cptr && out && "Cannot be null");
 
     const char *val = *cptr;
     size_t val_len = 0;
@@ -256,9 +256,9 @@ static int scan_str(mjarr_t *arr, const char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_num(mjarr_t *arr, const char **cptr, mjtok_t *out)
+static int scan_num(const char **cptr, mjtok_t *out)
 {
-    assert(arr && *cptr && out && "Cannot be null");
+    assert(*cptr && out && "Cannot be null");
 
     const char *val = *cptr;
     size_t val_len = 0;
@@ -320,9 +320,9 @@ static int scan_num(mjarr_t *arr, const char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_bool_true(mjarr_t *arr, const char **cptr, mjtok_t *out)
+static int scan_bool_true(const char **cptr, mjtok_t *out)
 {
-    assert(arr && *cptr && out && "Cannot be null");
+    assert(*cptr && out && "Cannot be null");
 
     const char *val = *cptr;
     size_t val_len = 0;
@@ -353,9 +353,9 @@ static int scan_bool_true(mjarr_t *arr, const char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_bool_false(mjarr_t *arr, const char **cptr, mjtok_t *out)
+static int scan_bool_false(const char **cptr, mjtok_t *out)
 {
-    assert(arr && *cptr && out && "Cannot be null");
+    assert(*cptr && out && "Cannot be null");
 
     const char *val = *cptr;
     size_t val_len = 0;
@@ -386,9 +386,9 @@ static int scan_bool_false(mjarr_t *arr, const char **cptr, mjtok_t *out)
     return 0;
 }
 
-static int scan_value_null(mjarr_t *arr, const char **cptr, mjtok_t *out)
+static int scan_value_null(const char **cptr, mjtok_t *out)
 {
-    assert(arr && *cptr && out && "Cannot be null");
+    assert(*cptr && out && "Cannot be null");
 
     const char *val = *cptr;
     size_t val_len = 0;
@@ -454,31 +454,31 @@ static int tokenize_json(mjarr_t *arr, const char *json)
         }
         if (is_quote_double(*cptr)) {
             mjtok_t tok;
-            MJ_RET_ON_ERR2(scan_str(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(scan_str(&cptr, &tok));
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
         if (isdigit(*cptr) || is_minus(*cptr)) {
             mjtok_t tok;
-            MJ_RET_ON_ERR2(scan_num(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(scan_num(&cptr, &tok));
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
         if (*cptr == CHAR_OF_TRUE(0)) {
             mjtok_t tok;
-            MJ_RET_ON_ERR2(scan_bool_true(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(scan_bool_true(&cptr, &tok));
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
         if (*cptr == CHAR_OF_FALSE(0)) {
             mjtok_t tok;
-            MJ_RET_ON_ERR2(scan_bool_false(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(scan_bool_false(&cptr, &tok));
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
         if (*cptr == CHAR_OF_NULL(0)) {
             mjtok_t tok;
-            MJ_RET_ON_ERR2(scan_value_null(arr, &cptr, &tok));
+            MJ_RET_ON_ERR2(scan_value_null(&cptr, &tok));
             MJ_RET_ON_ERR2(append_tok(arr, tok));
             goto advance;
         }
@@ -664,38 +664,30 @@ static void mj_free_pair_node(mj_pair_node_t *node)
 
 static void mj_free_str_node(mj_str_node_t *node)
 {
-    if (node) {
-        node->value = NULL;
-        node->len = 0;
-        free(node);
-    }
+    node->value = NULL;
+    node->len = 0;
+    free(node);
 }
 
 static void mj_free_num_node(mj_num_node_t *node)
 {
-    if (node) {
-        node->value = NULL;
-        node->len = 0;
-        free(node);
-    }
+    node->value = NULL;
+    node->len = 0;
+    free(node);
 }
 
 static void mj_free_bool_node(mj_bool_node_t *node)
 {
-    if (node) {
-        node->value = NULL;
-        node->len = 0;
-        free(node);
-    }
+    node->value = NULL;
+    node->len = 0;
+    free(node);
 }
 
 static void mj_free_null_node(mj_null_node_t *node)
 {
-    if (node) {
-        node->value = NULL;
-        node->len = 0;
-        free(node);
-    }
+    node->value = NULL;
+    node->len = 0;
+    free(node);
 }
 
 static void mj_free_node(mj_node_t *node)
