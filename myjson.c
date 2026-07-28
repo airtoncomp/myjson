@@ -891,7 +891,7 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
         }
 
         mj_arr_node_t *arr_node = frame->node->node;
-        arr_node->arr[arr_node->count]->node = node;
+        arr_node->arr[arr_node->count] = node;
         arr_node->count++;
 
         frame->frame_state = ARR_EXPECT_FIRST_VAL_OR_END;
@@ -1031,11 +1031,6 @@ static void mj_parse_colon(mj_frame_stack_t *stack)
 
     mj_frame_t *frame = &mj_frame_stack_top(stack);
 
-    if (mj_frame_type(frame) == ARR_FRAME) {
-        fprintf(stderr, "Unexpected ':' inside array\n");
-        return;
-    }
-
     if (mj_frame_type(frame) != OBJ_FRAME) {
         fprintf(stderr, "Unexpected ':' inside array\n");
         return;
@@ -1094,7 +1089,7 @@ static void mj_parse_comma(mj_frame_stack_t *stack)
 static void mj_parse_arr_start(mj_frame_stack_t *stack, mj_node_t **root)
 {
     mj_arr_node_t *arr_node = alloc_arr_node(MJ_ARRAY_NODE_INIT_CAP);
-    mj_node_t *node = alloc_node(arr_node, MJ_NODE_OBJECT);
+    mj_node_t *node = alloc_node(arr_node, MJ_NODE_ARRAY);
 
     if (attach_node(stack, node, root) < 0) {
         mj_free_arr_node(arr_node);
