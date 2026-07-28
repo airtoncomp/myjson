@@ -894,7 +894,7 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
         arr_node->arr[arr_node->count] = node;
         arr_node->count++;
 
-        frame->frame_state = ARR_EXPECT_FIRST_VAL_OR_END;
+        frame->frame_state = ARR_EXPECT_COMMA_OR_END;
 
         return 0;
     }
