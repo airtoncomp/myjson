@@ -614,6 +614,7 @@ static void mj_free_obj_node(mj_obj_node_t *node);
 static void mj_free_arr_node(mj_arr_node_t *node);
 static void mj_free_pair_node(mj_pair_node_t *node);
 static void mj_free_str_node(mj_str_node_t *node);
+static void mj_free_num_node(mj_num_node_t *node);
 static void mj_free_bool_node(mj_bool_node_t *node);
 static void mj_free_null_node(mj_null_node_t *node);
 static void mj_free_node(mj_node_t *node);
@@ -672,6 +673,15 @@ static void mj_free_str_node(mj_str_node_t *node)
     }
 }
 
+static void mj_free_num_node(mj_num_node_t *node)
+{
+    if (node) {
+        node->value = NULL;
+        node->len = 0;
+        free(node);
+    }
+}
+
 static void mj_free_bool_node(mj_bool_node_t *node)
 {
     if (node) {
@@ -707,6 +717,8 @@ static void mj_free_node(mj_node_t *node)
         break;
     }
     case MJ_NODE_NUMBER:
+        mj_free_num_node(node->node);
+        free(node);
         break;
     case MJ_NODE_BOOL:
         mj_free_bool_node(node->node);
@@ -812,6 +824,14 @@ static mj_str_node_t *alloc_str_node(const char *val, size_t val_len)
     str_node->value = val;
     str_node->len = val_len;
     return str_node;
+}
+
+static mj_num_node_t *alloc_num_node(const char *val, size_t val_len)
+{
+    mj_num_node_t *num_node = malloc(sizeof(*num_node));
+    num_node->value = val;
+    num_node->len = val_len;
+    return num_node;
 }
 
 static mj_bool_node_t *alloc_bool_node(const char *val, size_t val_len)
@@ -1044,6 +1064,13 @@ static void mj_parse_colon(mj_frame_stack_t *stack)
     frame->frame_state = OBJ_EXPECT_VAL;
 }
 
+static void mj_parse_num(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
+{
+    mj_num_node_t *num_node = alloc_num_node(val, val_len);
+    mj_node_t *node = alloc_node(num_node, MJ_NODE_NUMBER);
+    attach_node(stack, node, root);
+}
+
 static void mj_parse_bool(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
     mj_bool_node_t *bool_node = alloc_bool_node(val, val_len);
@@ -1169,7 +1196,7 @@ int myjson_parse(myjson_t *mj, const char *json)
             mj_parse_str(&stack, &mj->root, tok.value, tok.len);
             break;
         case MJTOK_NUMBER:
-            //TODO:
+            mj_parse_num(&stack, &mj->root, tok.value, tok.len);
             break;
         case MJTOK_BOOL:
             mj_parse_bool(&stack, &mj->root, tok.value, tok.len);
@@ -1208,6 +1235,7 @@ int myjson_parse(myjson_t *mj, const char *json)
  * MyJSON Printer
  */
 
+static void mj_print_num_node(mj_num_node_t *node);
 static void mj_print_bool_node(mj_bool_node_t *node);
 static void mj_print_null_node(mj_null_node_t *node);
 static void mj_print_str_node(const char *s, size_t slen);
@@ -1215,6 +1243,11 @@ static void mj_print_obj_node(const mj_obj_node_t *node);
 static void mj_print_arr_node(const mj_arr_node_t *node);
 static void mj_print_pair_node(const mj_pair_node_t *node);
 static void mj_print_node(const mj_node_t *node);
+
+static void mj_print_num_node(mj_num_node_t *node)
+{
+    printf("%*s", (int) node->len, node->value);
+}
 
 static void mj_print_null_node(mj_null_node_t *node)
 {
@@ -1323,6 +1356,7 @@ static void mj_print_node(const mj_node_t *node)
         break;
     }
     case MJ_NODE_NUMBER:
+        mj_print_num_node(node->node);
         break;
     case MJ_NODE_BOOL:
         mj_print_bool_node(node->node);
