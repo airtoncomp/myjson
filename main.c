@@ -14,8 +14,11 @@ void test() {
     //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
     //char *str = R"({"a":true, "b":false, "c":null})";
     //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
-    char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
+    //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
     //char *str = R"({"a":true})";
+    //char *str = R"({"a":[true]})";
+    //char *str = R"({"a":[{"b":"c"},{"d":true}, "elem"]})";
+    char *str = R"(["a",true])";
 
     printf("%s\n", str);
 
