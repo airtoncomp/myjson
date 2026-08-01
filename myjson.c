@@ -71,6 +71,13 @@
             }                                               \
         } while(0)
 
+#define MJ_RET_NULL_ON_TRUE(x, fmt, ...) do {               \
+            if (x) {                                        \
+                fprintf(stderr, fmt"\n", ##__VA_ARGS__);   \
+                return NULL;                                \
+            }                                               \
+        } while(0)                                          
+
 #define MJ_RET_ON_ERR(x, fmt, ...) do {                     \
             if (x < 0) {                                    \
                 fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
@@ -725,10 +732,8 @@ static void mj_free_node(mj_node_t *node)
 
 void myjson_free(myjson_t *mj)
 {
-    if (!mj || !mj->root) {
-        fprintf(stderr, "Cannot free null json root");
+    if (!mj || !mj->root)
         return;
-    }
     mj_free_node(mj->root);
     mj->root = NULL;
     free(mj);
@@ -869,11 +874,6 @@ static mj_node_t *alloc_node(void *child, mjnode_type_t type)
     node->node = child;
     node->type = type;
     return node;
-}
-
-inline myjson_t *myjson_create()
-{
-    return malloc(sizeof(myjson_t));
 }
 
 /**
@@ -1236,7 +1236,7 @@ static void mj_print_node(const mj_node_t *node);
 
 static void mj_print_num_node(const mj_num_node_t *node)
 {
-    printf("%*s", (int) node->len, node->value);
+    printf("%.*s", (int) node->len, node->value);
 }
 
 static void mj_print_null_node(const mj_null_node_t *node)
@@ -1355,16 +1355,77 @@ static void mj_print_node(const mj_node_t *node)
         mj_print_null_node(node->node);
         break;
     default:
-        fprintf(stderr, "Unknown json type");
+        fprintf(stderr, "Unknown json type\n");
     }
 }
 
 void myjson_print(const myjson_t *mj)
 {
     if (!mj || !mj->root) {
-        fprintf(stderr, "Cannot print null json root");
+        fprintf(stderr, "Cannot print null json root\n");
         return;
     }
     mj_print_node(mj->root);
+}
+
+/**
+ * MyJSON builders (public)
+ */
+
+inline myjson_t *myjson_create()
+{
+    myjson_t *mj = malloc(sizeof(myjson_t));
+    mj->root = NULL;
+    return mj;
+}
+
+inline myjson_t *myjson_create_root()
+{
+    myjson_t *mj = malloc(sizeof(myjson_t));
+    mj->root = NULL;
+    return mj;
+}
+
+myjson_t *myjson_create_obj(size_t cap)
+{
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(alloc_obj_node(cap), MJ_NODE_OBJECT);
+    return mj;
+}
+
+myjson_t *myjson_create_arr(size_t cap)
+{
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(alloc_arr_node(cap), MJ_NODE_ARRAY);
+    return mj;
+}
+
+myjson_t *myjson_create_pair_str(const char *key, char *val)
+{
+    MJ_RET_NULL_ON_TRUE(!key || (key && key[0] == '\0'), "Invalid key");
+    MJ_RET_NULL_ON_TRUE(!val || (val && val[0] == '\0'), "Invalid value");
+
+    mj_str_node_t *str_node = alloc_str_node(val, strlen(val));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_STRING));
+
+    myjson_t *mj = malloc(sizeof(mj));
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+
+    return mj;
+}
+
+void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair)
+{
+    mj_obj_node_t *node = obj->root->node;
+    append_mj_node(&node->members, pair->root);
+}
+
+void myjson_add_obj_to_root(myjson_t **root, myjson_t *obj)
+{
+    if ((*root)->root) {
+        fprintf(stderr, "Unexpected extra json value after root\n");
+        return;
+    }
+    (*root)->root = obj->root;
 }
 
