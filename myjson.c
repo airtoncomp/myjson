@@ -1255,42 +1255,49 @@ static void mj_print_bool_node(const mj_bool_node_t *node)
 
 static void mj_print_str_node(const char *s, size_t slen)
 {
-    printf("\"");
-
     for (size_t i = 0; i < slen; i++) {
-        if (is_quote_double(s[i])) {
-            printf("\\\"");
-            continue;
-        }
         if (is_bslash(s[i])) {
-            printf("\\\\");
-            continue;
+            i++;
+            if (is_quote_double(s[i])) {
+                printf("\\\"");
+                continue;
+            }
+            if (is_bslash(s[i])) {
+                printf("\\\\");
+                continue;
+            }
+            if (is_linefeed_n(s[i])) {
+                printf("\\n");
+                continue;
+            }
+            if (is_carret_r(s[i])) {
+                printf("\\r");
+                continue;
+            }
+            if (is_tab_t(s[i])) {
+                printf("\\t");
+                continue;
+            }
+            if (is_backspc_b(s[i])) {
+                printf("\\b");
+                continue;
+            }
+            if (is_formfeed_f(s[i])) {
+                printf("\\f");
+                continue;
+            }
+            if (is_hex_u(s[i])) {
+                i++;
+                int hex_count = 0;
+                for ( ; s[i] != '\0' && hex_count < 4; i++) {
+                    printf("\\u%c", s[i]);
+                    hex_count++;
+                }
+                continue;
+            }
         }
-        if (is_linefeed_n(s[i])) {
-            printf("\\n");
-            continue;
-        }
-        if (is_carret_r(s[i])) {
-            printf("\\r");
-            continue;
-        }
-        if (is_tab_t(s[i])) {
-            printf("\\t");
-            continue;
-        }
-        if (is_backspc_b(s[i])) {
-            printf("\\b");
-            continue;
-        }
-        if (is_formfeed_f(s[i])) {
-            printf("\\f");
-            continue;
-        }
-        //TODO: print unicode escape
         printf("%c", s[i]);
     }
-
-    printf("\"");
 }
 
 static void mj_print_obj_node(const mj_obj_node_t *node)
@@ -1404,7 +1411,7 @@ myjson_t *myjson_create_pair_str(const char *key, char *val)
 {
     MJ_RET_NULL_ON_TRUE(!key || (key && key[0] == '\0'), "Invalid key");
     MJ_RET_NULL_ON_TRUE(!val || (val && val[0] == '\0'), "Invalid value");
-
+    
     mj_str_node_t *str_node = alloc_str_node(val, strlen(val));
     mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_STRING));
 
