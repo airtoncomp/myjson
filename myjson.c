@@ -652,8 +652,9 @@ static void mj_free_arr_node(mj_arr_node_t *node)
                 mj_free_pair_node(pair_node);
                 continue;
             }
+            free(node->arr[i]->node);
+            free(node->arr[i]);
         }
-        free(node->arr[i]);
     }
     free(node->arr);
     node->arr = NULL;
@@ -700,33 +701,43 @@ static void mj_free_null_node(mj_null_node_t *node)
 static void mj_free_node(mj_node_t *node)
 {
     switch(node->type) {
-    case MJ_NODE_OBJECT:
+    case MJ_NODE_OBJECT: {
         mj_free_obj_node(node->node);
         free(node);
         break;
-    case MJ_NODE_ARRAY:
+    }
+    case MJ_NODE_ARRAY: {
         mj_free_arr_node(node->node);
-        break;
-    case MJ_NODE_STRING: {
-        mj_str_node_t *str_node = node->node;
-        mj_free_str_node(str_node);
         free(node);
         break;
     }
-    case MJ_NODE_NUMBER:
+    case MJ_NODE_STRING: {
+        mj_free_str_node(node->node);
+        free(node);
+        break;
+    }
+    case MJ_NODE_PAIR: {
+        mj_free_pair_node(node->node);
+        free(node);
+        break;
+    }
+    case MJ_NODE_NUMBER: {
         mj_free_num_node(node->node);
         free(node);
         break;
-    case MJ_NODE_BOOL:
+    }
+    case MJ_NODE_BOOL: {
         mj_free_bool_node(node->node);
         free(node);
         break;
-    case MJ_NODE_NULL:
+    }
+    case MJ_NODE_NULL: {
         mj_free_null_node(node->node);
         free(node);
         break;
+    }
     default:
-        fprintf(stderr, "Unknown json type");
+        fprintf(stderr, "Unknown json type\n");
     }
 }
 
