@@ -56,6 +56,7 @@ void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair);
 
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);
+void myjson_free_deep(myjson_t *mj);
 void myjson_free(myjson_t *mj);
 
 #endif

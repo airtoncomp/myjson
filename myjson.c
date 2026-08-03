@@ -741,13 +741,19 @@ static void mj_free_node(mj_node_t *node)
     }
 }
 
-void myjson_free(myjson_t *mj)
+void myjson_free_deep(myjson_t *mj)
 {
     if (!mj || !mj->root)
         return;
     mj_free_node(mj->root);
     mj->root = NULL;
     free(mj);
+}
+
+void myjson_free(myjson_t *mj)
+{
+    free(mj);
+    mj = NULL;
 }
 
 /**
@@ -1392,14 +1398,14 @@ void myjson_print(const myjson_t *mj)
 
 inline myjson_t *myjson_create()
 {
-    myjson_t *mj = malloc(sizeof(myjson_t));
+    myjson_t *mj = malloc(sizeof(*mj));
     mj->root = NULL;
     return mj;
 }
 
 inline myjson_t *myjson_create_root()
 {
-    myjson_t *mj = malloc(sizeof(myjson_t));
+    myjson_t *mj = malloc(sizeof(*mj));
     mj->root = NULL;
     return mj;
 }
@@ -1426,7 +1432,7 @@ myjson_t *myjson_create_pair_str(const char *key, char *val)
     mj_str_node_t *str_node = alloc_str_node(val, strlen(val));
     mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_STRING));
 
-    myjson_t *mj = malloc(sizeof(mj));
+    myjson_t *mj = malloc(sizeof(*mj));
     mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
 
     return mj;
@@ -1434,6 +1440,10 @@ myjson_t *myjson_create_pair_str(const char *key, char *val)
 
 void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair)
 {
+    if (obj->root->type != MJ_NODE_OBJECT) {
+        fprintf(stderr, "Json is not object\n");
+        return;
+    }
     mj_obj_node_t *node = obj->root->node;
     append_mj_node(&node->members, pair->root);
 }
