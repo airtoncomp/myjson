@@ -510,6 +510,8 @@ typedef enum {
     MJ_NODE_ARRAY,
     MJ_NODE_STRING,
     MJ_NODE_NUMBER,
+    MJ_NODE_INT_BYTE,
+    MJ_NODE_DOUBLE_BYTE,
     MJ_NODE_BOOL,
     MJ_NODE_NULL
 } mjnode_type_t;
@@ -545,6 +547,14 @@ typedef struct {
     const char      *value;
     size_t          len;
 } mj_num_node_t;
+
+typedef struct {
+    int             value;
+} mj_int_byte_node_t;
+
+typedef struct {
+    double          value;
+} mj_double_byte_node_t;
 
 typedef struct {
     const char      *value;
@@ -741,7 +751,7 @@ static void mj_free_node(mj_node_t *node)
     }
 }
 
-void myjson_free_deep(myjson_t *mj)
+void myjson_free_root(myjson_t *mj)
 {
     if (!mj || !mj->root)
         return;
@@ -844,6 +854,20 @@ static mj_num_node_t *alloc_num_node(const char *val, size_t val_len)
     num_node->value = val;
     num_node->len = val_len;
     return num_node;
+}
+
+static mj_int_byte_node_t *alloc_int_byte_node(int val)
+{
+    mj_int_byte_node_t *int_node = malloc(sizeof(*int_node));
+    int_node->value = val;
+    return int_node;
+}
+
+static mj_double_byte_node_t *alloc_double_byte_node(double val)
+{
+    mj_double_byte_node_t *double_node = malloc(sizeof(*double_node));
+    double_node->value = val;
+    return double_node;
 }
 
 static mj_bool_node_t *alloc_bool_node(const char *val, size_t val_len)
@@ -1243,6 +1267,8 @@ int myjson_parse(myjson_t *mj, const char *json)
  */
 
 static void mj_print_num_node(const mj_num_node_t *node);
+static void mj_print_int_byte_node(const mj_int_byte_node_t *node);
+static void mj_print_double_byte_node(const mj_double_byte_node_t *node);
 static void mj_print_bool_node(const mj_bool_node_t *node);
 static void mj_print_null_node(const mj_null_node_t *node);
 static void mj_print_str_node(const char *s, size_t slen);
@@ -1254,6 +1280,16 @@ static void mj_print_node(const mj_node_t *node);
 static void mj_print_num_node(const mj_num_node_t *node)
 {
     printf("%.*s", (int) node->len, node->value);
+}
+
+static void mj_print_int_byte_node(const mj_int_byte_node_t *node)
+{
+    printf("%d", node->value);
+}
+
+static void mj_print_double_byte_node(const mj_double_byte_node_t *node)
+{
+    printf("%lf", node->value);
 }
 
 static void mj_print_null_node(const mj_null_node_t *node)
@@ -1372,6 +1408,12 @@ static void mj_print_node(const mj_node_t *node)
     case MJ_NODE_NUMBER:
         mj_print_num_node(node->node);
         break;
+    case MJ_NODE_INT_BYTE:
+        mj_print_int_byte_node(node->node);
+        break;
+    case MJ_NODE_DOUBLE_BYTE:
+        mj_print_double_byte_node(node->node);
+        break;
     case MJ_NODE_BOOL:
         mj_print_bool_node(node->node);
         break;
@@ -1431,6 +1473,32 @@ myjson_t *myjson_create_pair_str(const char *key, char *val)
     
     mj_str_node_t *str_node = alloc_str_node(val, strlen(val));
     mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_STRING));
+
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+
+    return mj;
+}
+
+myjson_t *myjson_create_pair_int(const char *key, int val)
+{
+    MJ_RET_NULL_ON_TRUE(!key || (key && key[0] == '\0'), "Invalid key");
+
+    mj_int_byte_node_t *int_node = alloc_int_byte_node(val);
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(int_node, MJ_NODE_INT_BYTE));
+
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+
+    return mj;
+}
+
+myjson_t *myjson_create_pair_double(const char *key, double val)
+{
+    MJ_RET_NULL_ON_TRUE(!key || (key && key[0] == '\0'), "Invalid key");
+
+    mj_double_byte_node_t *int_node = alloc_double_byte_node(val);
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(int_node, MJ_NODE_DOUBLE_BYTE));
 
     myjson_t *mj = malloc(sizeof(*mj));
     mj->root = alloc_node(pair_node, MJ_NODE_PAIR);

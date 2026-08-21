@@ -45,8 +45,8 @@ myjson_t *myjson_create();
 myjson_t *myjson_create_root();
 myjson_t *myjson_create_obj(size_t cap);
 myjson_t *myjson_create_pair_str(const char *key, char *val);
-//myjson_t *myjson_create_pair_int(const char *key, int val); //TODO
-//myjson_t *myjson_create_pair_double(const char *key, double val); //TODO
+myjson_t *myjson_create_pair_int(const char *key, int val);
+myjson_t *myjson_create_pair_double(const char *key, double val);
 //myjson_t *myjson_create_pair_true(const char *key); //TODO
 //myjson_t *myjson_create_pair_false(const char *key); //TODO
 myjson_t *myjson_create_arr(size_t cap);
@@ -56,7 +56,7 @@ void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair);
 
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);
-void myjson_free_deep(myjson_t *mj);
+void myjson_free_root(myjson_t *mj);
 void myjson_free(myjson_t *mj);
 
 #endif
