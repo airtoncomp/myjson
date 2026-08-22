@@ -73,12 +73,39 @@ void test_object()
     printf("\n--- END: TEST OBJECT CREATION ---\n");
 }
 
+void test_array()
+{
+    printf("\n--- BEGIN: TEST ARRAY CREATION ---\n");
+
+    myjson_t *mj = myjson_create_root();
+    myjson_t *arr = myjson_create_arr(6);
+    
+    myjson_append_str_to_arr(arr, MJ_STR("name"));
+    myjson_append_int_to_arr(arr, 23);
+    myjson_append_double_to_arr(arr, -4.5e-3);
+    myjson_append_true_to_arr(arr);
+    myjson_append_false_to_arr(arr);
+    myjson_append_null_to_arr(arr);
+
+    myjson_add_arr_to_root(&mj, arr);
+
+    myjson_print(mj);
+
+    myjson_free(arr);
+    myjson_free_root(mj);
+
+    printf("\n--- END: TEST ARRAY CREATION ---\n");
+}
+
 int main () 
 {
     test();
     printf("\n");
 
     test_object();
+    printf("\n");
+
+    test_array();
     printf("\n");
 
     printf("myjson lib\n");
