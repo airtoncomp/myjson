@@ -36,14 +36,20 @@ void test_object()
     printf("\n--- BEGIN: TEST OBJECT CREATION ---\n");
 
     myjson_t *mj = myjson_create_root();
-    myjson_t *obj = myjson_create_obj(3);
+    myjson_t *obj = myjson_create_obj(6);
     myjson_t *str_pair = myjson_create_pair_str(MJ_STR("a"), MJ_STR("\r"));
     myjson_t *int_pair = myjson_create_pair_int(MJ_STR("b"), 45);
     myjson_t *double_pair = myjson_create_pair_double(MJ_STR("c"), 32.5e-4);
+    myjson_t *true_pair = myjson_create_pair_true(MJ_STR("d"));
+    myjson_t *false_pair = myjson_create_pair_false(MJ_STR("f"));
+    myjson_t *null_pair = myjson_create_pair_null(MJ_STR("g"));
 
     myjson_add_pair_to_obj(obj, str_pair);
     myjson_add_pair_to_obj(obj, int_pair);
     myjson_add_pair_to_obj(obj, double_pair);
+    myjson_add_pair_to_obj(obj, true_pair);
+    myjson_add_pair_to_obj(obj, false_pair);
+    myjson_add_pair_to_obj(obj, null_pair);
     myjson_add_obj_to_root(&mj, obj);
     
     myjson_print(mj);
@@ -51,6 +57,9 @@ void test_object()
     myjson_free(str_pair);
     myjson_free(int_pair);
     myjson_free(double_pair);
+    myjson_free(true_pair);
+    myjson_free(false_pair);
+    myjson_free(null_pair);
     myjson_free_root(mj);
 
     printf("\n--- END: TEST OBJECT CREATION ---\n");
