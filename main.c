@@ -10,6 +10,8 @@
 
 void test() 
 {
+    printf("\n--- BEGIN: TEST TOKENIZER AND PARSER ---\n");
+
     //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
     //char *str = "{\"a\":\"b\", \"c\":[]}";
     //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
@@ -29,6 +31,8 @@ void test()
     myjson_parse(mj, str);
     myjson_print(mj);
     myjson_free_root(mj);
+
+    printf("\n--- END: TEST TOKENIZER AND PARSER ---\n");
 }
 
 void test_object()
@@ -50,9 +54,13 @@ void test_object()
     myjson_add_pair_to_obj(obj, true_pair);
     myjson_add_pair_to_obj(obj, false_pair);
     myjson_add_pair_to_obj(obj, null_pair);
+
+    myjson_del_pair_from_obj(obj, MJ_STR("c"));
+
     myjson_add_obj_to_root(&mj, obj);
-    
+
     myjson_print(mj);
+
     myjson_free(obj);
     myjson_free(str_pair);
     myjson_free(int_pair);
