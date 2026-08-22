@@ -47,8 +47,9 @@ myjson_t *myjson_create_obj(size_t cap);
 myjson_t *myjson_create_pair_str(const char *key, char *val);
 myjson_t *myjson_create_pair_int(const char *key, int val);
 myjson_t *myjson_create_pair_double(const char *key, double val);
-//myjson_t *myjson_create_pair_true(const char *key); //TODO
-//myjson_t *myjson_create_pair_false(const char *key); //TODO
+myjson_t *myjson_create_pair_true(const char *key);
+myjson_t *myjson_create_pair_false(const char *key);
+myjson_t *myjson_create_pair_null(const char *key);
 myjson_t *myjson_create_arr(size_t cap);
 
 void myjson_add_obj_to_root(myjson_t **root, myjson_t *obj);

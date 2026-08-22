@@ -694,6 +694,16 @@ static void mj_free_num_node(mj_num_node_t *node)
     free(node);
 }
 
+static void mj_free_int_byte_node(mj_int_byte_node_t *node)
+{
+    free(node);
+}
+
+static void mj_free_double_byte_node(mj_double_byte_node_t *node)
+{
+    free(node);
+}
+
 static void mj_free_bool_node(mj_bool_node_t *node)
 {
     node->value = NULL;
@@ -733,6 +743,16 @@ static void mj_free_node(mj_node_t *node)
     }
     case MJ_NODE_NUMBER: {
         mj_free_num_node(node->node);
+        free(node);
+        break;
+    }
+    case MJ_NODE_INT_BYTE: {
+        mj_free_int_byte_node(node->node);
+        free(node);
+        break;
+    }
+    case MJ_NODE_DOUBLE_BYTE: {
+        mj_free_double_byte_node(node->node);
         free(node);
         break;
     }
@@ -1499,6 +1519,39 @@ myjson_t *myjson_create_pair_double(const char *key, double val)
 
     mj_double_byte_node_t *int_node = alloc_double_byte_node(val);
     mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(int_node, MJ_NODE_DOUBLE_BYTE));
+
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+
+    return mj;
+}
+
+myjson_t *myjson_create_pair_true(const char *key)
+{
+    mj_bool_node_t *bool_node = alloc_bool_node("true", strlen("true"));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(bool_node, MJ_NODE_BOOL));
+
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+
+    return mj;
+}
+
+myjson_t *myjson_create_pair_false(const char *key)
+{
+    mj_bool_node_t *bool_node = alloc_bool_node("false", strlen("false"));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(bool_node, MJ_NODE_BOOL));
+
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+
+    return mj;
+}
+
+myjson_t *myjson_create_pair_null(const char *key)
+{
+    mj_null_node_t *null_node = alloc_null_node("null", strlen("null"));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(null_node, MJ_NODE_NULL));
 
     myjson_t *mj = malloc(sizeof(*mj));
     mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
