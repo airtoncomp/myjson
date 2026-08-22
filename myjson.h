@@ -53,7 +53,15 @@ myjson_t *myjson_create_pair_null(const char *key);
 myjson_t *myjson_create_arr(size_t cap);
 
 void myjson_add_obj_to_root(myjson_t **root, myjson_t *obj);
+void myjson_add_arr_to_root(myjson_t **root, myjson_t *arr);
 void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair);
+
+void myjson_append_str_to_arr(myjson_t *arr, char *val);
+void myjson_append_int_to_arr(myjson_t *arr, int val);
+void myjson_append_double_to_arr(myjson_t *arr, double val);
+void myjson_append_true_to_arr(myjson_t *arr);
+void myjson_append_false_to_arr(myjson_t *arr);
+void myjson_append_null_to_arr(myjson_t *arr);
 
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
 

@@ -1615,6 +1615,15 @@ void myjson_add_obj_to_root(myjson_t **root, myjson_t *obj)
     (*root)->root = obj->root;
 }
 
+void myjson_add_arr_to_root(myjson_t **root, myjson_t *arr)
+{
+    if ((*root)->root) {
+        fprintf(stderr, "Unexpected extra json value after root\n");
+        return;
+    }
+    (*root)->root = arr->root;
+}
+
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key)
 {
     if (!key || (key && key[0] == '\0')) {
@@ -1627,4 +1636,50 @@ void myjson_del_pair_from_obj(myjson_t *obj, const char *key)
     }
     mj_obj_node_t *node = obj->root->node;
     remove_pair_node(&node->members, key);
+}
+
+void myjson_append_str_to_arr(myjson_t *arr, char *val)
+{
+    if (!val) {
+        fprintf(stderr, "Invalid value\n");
+        return;
+    }
+    mj_str_node_t *str_node = alloc_str_node(val, strlen(val));
+    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+    append_mj_node(arr->root->node, node);
+}
+
+void myjson_append_int_to_arr(myjson_t *arr, int val)
+{
+    mj_int_byte_node_t *int_node = alloc_int_byte_node(val);
+    mj_node_t *node = alloc_node(int_node, MJ_NODE_INT_BYTE);
+    append_mj_node(arr->root->node, node);
+}
+
+void myjson_append_double_to_arr(myjson_t *arr, double val)
+{
+    mj_double_byte_node_t *double_node = alloc_double_byte_node(val);
+    mj_node_t *node = alloc_node(double_node, MJ_NODE_DOUBLE_BYTE);
+    append_mj_node(arr->root->node, node);
+}
+
+void myjson_append_true_to_arr(myjson_t *arr)
+{
+    mj_bool_node_t *bool_node = alloc_bool_node("true", strlen("true"));
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    append_mj_node(arr->root->node, node);
+}
+
+void myjson_append_false_to_arr(myjson_t *arr)
+{
+    mj_bool_node_t *bool_node = alloc_bool_node("false", strlen("false"));
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    append_mj_node(arr->root->node, node);
+}
+
+void myjson_append_null_to_arr(myjson_t *arr)
+{
+    mj_null_node_t *null_node = alloc_null_node("null", strlen("null"));
+    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
+    append_mj_node(arr->root->node, node);
 }
