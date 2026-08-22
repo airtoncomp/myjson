@@ -1683,3 +1683,8 @@ void myjson_append_null_to_arr(myjson_t *arr)
     mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
     append_mj_node(arr->root->node, node);
 }
+
+void myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj)
+{
+    append_mj_node(arr->root->node, obj->root);
+}

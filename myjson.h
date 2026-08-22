@@ -62,6 +62,7 @@ void myjson_append_double_to_arr(myjson_t *arr, double val);
 void myjson_append_true_to_arr(myjson_t *arr);
 void myjson_append_false_to_arr(myjson_t *arr);
 void myjson_append_null_to_arr(myjson_t *arr);
+void myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj);
 
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
 
