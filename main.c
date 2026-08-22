@@ -78,7 +78,7 @@ void test_array()
     printf("\n--- BEGIN: TEST ARRAY CREATION ---\n");
 
     myjson_t *mj = myjson_create_root();
-    myjson_t *arr = myjson_create_arr(6);
+    myjson_t *arr = myjson_create_arr(7);
     
     myjson_append_str_to_arr(arr, MJ_STR("name"));
     myjson_append_int_to_arr(arr, 23);
@@ -86,6 +86,12 @@ void test_array()
     myjson_append_true_to_arr(arr);
     myjson_append_false_to_arr(arr);
     myjson_append_null_to_arr(arr);
+
+    myjson_t *obj = myjson_create_obj(1);
+    myjson_t *str_pair = myjson_create_pair_str(MJ_STR("a"), MJ_STR("\r"));
+    myjson_add_pair_to_obj(obj, str_pair);
+
+    myjson_append_obj_to_arr(arr, obj);
 
     myjson_add_arr_to_root(&mj, arr);
 
