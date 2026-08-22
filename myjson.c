@@ -73,7 +73,7 @@
 
 #define MJ_RET_NULL_ON_TRUE(x, fmt, ...) do {               \
             if (x) {                                        \
-                fprintf(stderr, fmt"\n", ##__VA_ARGS__);   \
+                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
                 return NULL;                                \
             }                                               \
         } while(0)                                          
@@ -538,6 +538,8 @@ typedef struct {
     int             allow_growth;
 } mj_arr_node_t;
 
+#define mj_arr_node_idx(a, i)   (a->arr[i])
+
 typedef struct {
     const char      *value;
     size_t          len;
@@ -576,6 +578,15 @@ typedef struct {
     mj_arr_node_t   members;
 } mj_obj_node_t;
 
+#define mj_cast_to_str_node(x)      ((mj_str_node_t *) x)
+#define mj_cast_to_num_node(x)      ((mj_num_node_t *) x)
+#define mj_cast_to_int_node(x)      ((mj_int_node_t *) x)
+#define mj_cast_to_double_node(x)   ((mj_double_node_t *) x)
+#define mj_cast_to_bool_node(x)     ((mj_bool_node_t *) x)
+#define mj_cast_to_null_node(x)     ((mj_null_node_t *) x)
+#define mj_cast_to_pair_node(x)     ((mj_pair_node_t *) x)
+#define mj_cast_to_obj_node(x)      ((mj_obj_node_t *) x)
+#define mj_cast_to_arr_node(x)      ((mj_arr_node_t *) x)
 
 /**
  * This is the type that is exposed to the user of library.
@@ -856,6 +867,32 @@ static int append_mj_node(mj_arr_node_t *arr, mj_node_t *node)
     }
 
     arr->arr[arr->count++] = node;
+
+    return 0;
+}
+
+static int remove_pair_node(mj_arr_node_t *arr, const char *key)
+{
+    assert(arr != NULL && "Array cannot be null");
+    
+    size_t i = 0;
+    for (; i < arr->count; i++) {
+        mj_pair_node_t *node = mj_arr_node_idx(arr, i)->node;
+        if (node && strncmp(node->key, key, node->keylen) != 0)
+            continue;
+        mj_free_pair_node(node);
+        free(mj_arr_node_idx(arr, i));
+        mj_arr_node_idx(arr, i) = NULL;
+        break;
+    }
+
+    /* Move elements to open position */
+    for (size_t j = i; j < arr->count-1; j++) 
+        mj_arr_node_idx(arr, j) = mj_arr_node_idx(arr, j+1);
+
+    /* Last position stay open */
+    mj_arr_node_idx(arr, arr->count-1) = NULL;
+    arr->count--;
 
     return 0;
 }
@@ -1578,3 +1615,16 @@ void myjson_add_obj_to_root(myjson_t **root, myjson_t *obj)
     (*root)->root = obj->root;
 }
 
+void myjson_del_pair_from_obj(myjson_t *obj, const char *key)
+{
+    if (!key || (key && key[0] == '\0')) {
+        fprintf(stderr, "Invalid key\n");
+        return;
+    }
+    if (!obj && !obj->root) {
+        fprintf(stderr, "Null pointer\n");
+        return;
+    }
+    mj_obj_node_t *node = obj->root->node;
+    remove_pair_node(&node->members, key);
+}

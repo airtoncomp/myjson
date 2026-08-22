@@ -55,6 +55,8 @@ myjson_t *myjson_create_arr(size_t cap);
 void myjson_add_obj_to_root(myjson_t **root, myjson_t *obj);
 void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair);
 
+void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
+
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);
 void myjson_free_root(myjson_t *mj);
