@@ -509,6 +509,7 @@ typedef enum {
     MJ_NODE_PAIR,
     MJ_NODE_ARRAY,
     MJ_NODE_STRING,
+    MJ_NODE_MUT_STRING,
     MJ_NODE_NUMBER,
     MJ_NODE_INT_BYTE,
     MJ_NODE_DOUBLE_BYTE,
@@ -546,6 +547,11 @@ typedef struct {
 } mj_str_node_t;
 
 typedef struct {
+    char            *value;
+    size_t          len;
+} mj_mut_str_node_t;
+
+typedef struct {
     const char      *value;
     size_t          len;
 } mj_num_node_t;
@@ -578,15 +584,6 @@ typedef struct {
     mj_arr_node_t   members;
 } mj_obj_node_t;
 
-#define mj_cast_to_str_node(x)      ((mj_str_node_t *) x)
-#define mj_cast_to_num_node(x)      ((mj_num_node_t *) x)
-#define mj_cast_to_int_node(x)      ((mj_int_node_t *) x)
-#define mj_cast_to_double_node(x)   ((mj_double_node_t *) x)
-#define mj_cast_to_bool_node(x)     ((mj_bool_node_t *) x)
-#define mj_cast_to_null_node(x)     ((mj_null_node_t *) x)
-#define mj_cast_to_pair_node(x)     ((mj_pair_node_t *) x)
-#define mj_cast_to_obj_node(x)      ((mj_obj_node_t *) x)
-#define mj_cast_to_arr_node(x)      ((mj_arr_node_t *) x)
 
 /**
  * This is the type that is exposed to the user of library.
@@ -642,6 +639,7 @@ static void mj_free_obj_node(mj_obj_node_t *node);
 static void mj_free_arr_node(mj_arr_node_t *node);
 static void mj_free_pair_node(mj_pair_node_t *node);
 static void mj_free_str_node(mj_str_node_t *node);
+static void mj_free_mut_str_node(mj_mut_str_node_t *node);
 static void mj_free_num_node(mj_num_node_t *node);
 static void mj_free_bool_node(mj_bool_node_t *node);
 static void mj_free_null_node(mj_null_node_t *node);
@@ -650,13 +648,8 @@ static void mj_free_node(mj_node_t *node);
 static void mj_free_obj_node(mj_obj_node_t *node)
 {
     for (size_t i = 0; i < node->members.cap; i++) {
-        if (node->members.arr[i]) {
-            if (node->members.arr[i]->node) {
-                mj_pair_node_t *pair_node = node->members.arr[i]->node;
-                mj_free_pair_node(pair_node);
-            }
-            free(node->members.arr[i]);
-        }
+        if (node->members.arr[i])
+            mj_free_node(node->members.arr[i]);
     }
     free(node->members.arr);
     node->members.arr = NULL;
@@ -667,14 +660,10 @@ static void mj_free_obj_node(mj_obj_node_t *node)
 static void mj_free_arr_node(mj_arr_node_t *node)
 {
     for (size_t i = 0; i < node->cap; i++) {
-        if (node->arr[i] && node->arr[i]->node) {
-            if (node->arr[i]->type == MJ_NODE_PAIR) {
-                mj_pair_node_t *pair_node = node->arr[i]->node;
-                mj_free_pair_node(pair_node);
-                continue;
-            }
-            free(node->arr[i]->node);
-            free(node->arr[i]);
+        if (!node->arr[i])
+            continue;
+        if (node->arr[i]->node) {
+            mj_free_node(node->arr[i]);
         }
     }
     free(node->arr);
@@ -694,6 +683,16 @@ static void mj_free_pair_node(mj_pair_node_t *node)
 static void mj_free_str_node(mj_str_node_t *node)
 {
     node->value = NULL;
+    node->len = 0;
+    free(node);
+}
+
+static void mj_free_mut_str_node(mj_mut_str_node_t *node)
+{
+    if (node && node->value) {
+        free(node->value);
+        node->value = NULL;
+    }
     node->len = 0;
     free(node);
 }
@@ -747,6 +746,11 @@ static void mj_free_node(mj_node_t *node)
         free(node);
         break;
     }
+    case MJ_NODE_MUT_STRING: {
+        mj_free_mut_str_node(node->node);
+        free(node);
+        break;
+    }
     case MJ_NODE_PAIR: {
         mj_free_pair_node(node->node);
         free(node);
@@ -789,10 +793,13 @@ void myjson_free_root(myjson_t *mj)
     mj_free_node(mj->root);
     mj->root = NULL;
     free(mj);
+    mj = NULL;
 }
 
 void myjson_free(myjson_t *mj)
 {
+    if (!mj && !mj->root)
+        return;
     free(mj);
     mj = NULL;
 }
@@ -849,7 +856,7 @@ static void init_mj_arr_node(mj_arr_node_t *arr, size_t cap)
 {
     assert(arr != NULL && "Array cannot be null");
 
-    arr->arr = calloc(cap, sizeof(arr->arr));
+    arr->arr = calloc(cap, sizeof(*arr->arr));
     arr->count = 0;
     arr->cap = cap;
 }
@@ -862,6 +869,7 @@ static int append_mj_node(mj_arr_node_t *arr, mj_node_t *node)
         size_t new_cap = arr->cap * MJ_NODE_ARRAY_GROWTH_FACTOR;
         mj_node_t **tmp = realloc(arr->arr, new_cap * sizeof(arr->arr));
         MJ_RET_ERR_ON_NULL(tmp, "Out of memory failure");
+        mj_free_arr_node(arr);
         arr->arr = tmp;
         arr->cap = new_cap;
     }
@@ -897,10 +905,39 @@ static int remove_pair_node(mj_arr_node_t *arr, const char *key)
     return 0;
 }
 
+static int update_mut_str_pair_node(mj_arr_node_t *arr, const char *key, char *val)
+{
+    assert(arr != NULL && "Array cannot be null");
+    
+    size_t i = 0;
+    for (; i < arr->count; i++) {
+        mj_pair_node_t *pair_node = mj_arr_node_idx(arr, i)->node;
+        if (pair_node && strncmp(pair_node->key, key, pair_node->keylen) != 0)
+            continue;
+        mj_node_t *node = pair_node->value; 
+        MJ_RET_ERR_ON_TRUE(node->type != MJ_NODE_MUT_STRING, 
+                            "Destination field is not string type");
+        mj_mut_str_node_t *str_node = node->node;
+        free(str_node->value);
+        str_node->value = strdup(val);
+        str_node->len = strlen(val);
+        break;
+    }
+    return 0;
+}
+
 static mj_str_node_t *alloc_str_node(const char *val, size_t val_len)
 {
     mj_str_node_t *str_node = malloc(sizeof(*str_node));
     str_node->value = val;
+    str_node->len = val_len;
+    return str_node;
+}
+
+static mj_mut_str_node_t *alloc_mut_str_node(const char *val, size_t val_len)
+{
+    mj_mut_str_node_t *str_node = malloc(sizeof(*str_node));
+    str_node->value = strdup(val);
     str_node->len = val_len;
     return str_node;
 }
@@ -1462,6 +1499,11 @@ static void mj_print_node(const mj_node_t *node)
         mj_print_str_node(str_node->value, str_node->len);
         break;
     }
+    case MJ_NODE_MUT_STRING: {
+        mj_mut_str_node_t *str_node = node->node;
+        mj_print_str_node(str_node->value, str_node->len);
+        break;
+    }
     case MJ_NODE_NUMBER:
         mj_print_num_node(node->node);
         break;
@@ -1528,8 +1570,8 @@ myjson_t *myjson_create_pair_str(const char *key, char *val)
     MJ_RET_NULL_ON_TRUE(!key || (key && key[0] == '\0'), "Invalid key");
     MJ_RET_NULL_ON_TRUE(!val || (val && val[0] == '\0'), "Invalid value");
     
-    mj_str_node_t *str_node = alloc_str_node(val, strlen(val));
-    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_STRING));
+    mj_mut_str_node_t *str_node = alloc_mut_str_node(val, strlen(val));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_MUT_STRING));
 
     myjson_t *mj = malloc(sizeof(*mj));
     mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
@@ -1636,6 +1678,24 @@ void myjson_del_pair_from_obj(myjson_t *obj, const char *key)
     }
     mj_obj_node_t *node = obj->root->node;
     remove_pair_node(&node->members, key);
+}
+
+void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, char *val)
+{
+    if (!key || (key && key[0] == '\0')) {
+        fprintf(stderr, "Invalid key\n");
+        return;
+    }
+    if (!val || (val && val[0] == '\0')) {
+        fprintf(stderr, "Invalid value\n");
+        return;
+    }
+    if (!obj && !obj->root) {
+        fprintf(stderr, "Null pointer\n");
+        return;
+    }
+    mj_obj_node_t *node = obj->root->node;
+    update_mut_str_pair_node(&node->members, key, val);
 }
 
 void myjson_append_str_to_arr(myjson_t *arr, char *val)
