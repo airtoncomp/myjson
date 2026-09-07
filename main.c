@@ -128,6 +128,8 @@ void test_array()
     myjson_replace_arr_elem_w_null(arr, 1);
     myjson_replace_arr_elem_w_str(arr, 0, MJ_STR("testing"));
 
+    myjson_del_elem_from_arr(arr, 1);
+
     myjson_append_obj_to_arr(arr, obj);
 
     myjson_add_arr_to_root(&mj, arr);
