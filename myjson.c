@@ -1909,6 +1909,10 @@ void myjson_update_pair_in_obj(myjson_t *obj, const char *key, const myjson_t *m
 
 void myjson_append_str_to_arr(myjson_t *arr, char *val)
 {
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
     if (!val) {
         fprintf(stderr, "Invalid value\n");
         return;
@@ -1920,6 +1924,10 @@ void myjson_append_str_to_arr(myjson_t *arr, char *val)
 
 void myjson_append_int_to_arr(myjson_t *arr, int val)
 {
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
     mj_int_byte_node_t *int_node = alloc_int_byte_node(val);
     mj_node_t *node = alloc_node(int_node, MJ_NODE_INT_BYTE);
     append_mj_node(arr->root->node, node);
@@ -1927,6 +1935,10 @@ void myjson_append_int_to_arr(myjson_t *arr, int val)
 
 void myjson_append_double_to_arr(myjson_t *arr, double val)
 {
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
     mj_double_byte_node_t *double_node = alloc_double_byte_node(val);
     mj_node_t *node = alloc_node(double_node, MJ_NODE_DOUBLE_BYTE);
     append_mj_node(arr->root->node, node);
@@ -1934,6 +1946,10 @@ void myjson_append_double_to_arr(myjson_t *arr, double val)
 
 void myjson_append_true_to_arr(myjson_t *arr)
 {
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
     mj_bool_node_t *bool_node = alloc_bool_node("true", strlen("true"));
     mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
     append_mj_node(arr->root->node, node);
@@ -1941,6 +1957,10 @@ void myjson_append_true_to_arr(myjson_t *arr)
 
 void myjson_append_false_to_arr(myjson_t *arr)
 {
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
     mj_bool_node_t *bool_node = alloc_bool_node("false", strlen("false"));
     mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
     append_mj_node(arr->root->node, node);
@@ -1948,6 +1968,10 @@ void myjson_append_false_to_arr(myjson_t *arr)
 
 void myjson_append_null_to_arr(myjson_t *arr)
 {
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
     mj_null_node_t *null_node = alloc_null_node("null", strlen("null"));
     mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
     append_mj_node(arr->root->node, node);
@@ -1955,5 +1979,111 @@ void myjson_append_null_to_arr(myjson_t *arr)
 
 void myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj)
 {
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
     append_mj_node(arr->root->node, obj->root);
+}
+
+static void replace_arr_elem(mj_arr_node_t *arr, size_t idx, mj_node_t *node)
+{
+    mj_free_node(mj_arr_node_idx(arr, idx));
+    mj_arr_node_idx(arr, idx) = node;
+}
+
+void myjson_replace_arr_elem_w_int(myjson_t *arr, size_t idx, int elem)
+{
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
+    mj_arr_node_t *arr_node = arr->root->node;
+    if (idx > arr_node->count) {
+        fprintf(stderr, "FAIL: Index out-of-range\n");
+        return;
+    }
+    mj_int_byte_node_t *int_node = alloc_int_byte_node(elem);
+    mj_node_t *node = alloc_node(int_node, MJ_NODE_INT_BYTE);
+    replace_arr_elem(arr_node, idx, node);
+}
+
+void myjson_replace_arr_elem_w_double(myjson_t *arr, size_t idx, double elem)
+{
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
+    mj_arr_node_t *arr_node = arr->root->node;
+    if (idx > arr_node->count) {
+        fprintf(stderr, "FAIL: Index out-of-range\n");
+        return;
+    }
+    mj_double_byte_node_t *double_node = alloc_double_byte_node(elem);
+    mj_node_t *node = alloc_node(double_node, MJ_NODE_DOUBLE_BYTE);
+    replace_arr_elem(arr_node, idx, node);
+}
+
+void myjson_replace_arr_elem_w_true(myjson_t *arr, size_t idx)
+{
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
+    mj_arr_node_t *arr_node = arr->root->node;
+    if (idx > arr_node->count) {
+        fprintf(stderr, "FAIL: Index out-of-range\n");
+        return;
+    }
+    mj_bool_node_t *bool_node = alloc_bool_node("true", strlen("true"));
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    replace_arr_elem(arr_node, idx, node);
+}
+
+void myjson_replace_arr_elem_w_false(myjson_t *arr, size_t idx)
+{
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
+    mj_arr_node_t *arr_node = arr->root->node;
+    if (idx > arr_node->count) {
+        fprintf(stderr, "FAIL: Index out-of-range\n");
+        return;
+    }
+    mj_bool_node_t *bool_node = alloc_bool_node("false", strlen("false"));
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    replace_arr_elem(arr_node, idx, node);
+}
+
+void myjson_replace_arr_elem_w_null(myjson_t *arr, size_t idx)
+{
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
+    mj_arr_node_t *arr_node = arr->root->node;
+    if (idx > arr_node->count) {
+        fprintf(stderr, "FAIL: Index out-of-range\n");
+        return;
+    }
+    mj_null_node_t *null_node = alloc_null_node("null", strlen("null"));
+    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
+    replace_arr_elem(arr_node, idx, node);
+}
+
+void myjson_replace_arr_elem_w_str(myjson_t *arr, size_t idx, char *elem)
+{
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
+    mj_arr_node_t *arr_node = arr->root->node;
+    if (idx > arr_node->count) {
+        fprintf(stderr, "FAIL: Index out-of-range\n");
+        return;
+    }
+    mj_str_node_t *str_node = alloc_str_node(elem, strlen(elem));
+    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+    replace_arr_elem(arr_node, idx, node);
 }

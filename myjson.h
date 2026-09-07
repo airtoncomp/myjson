@@ -64,7 +64,15 @@ void myjson_append_false_to_arr(myjson_t *arr);
 void myjson_append_null_to_arr(myjson_t *arr);
 void myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj);
 
+void myjson_replace_arr_elem_w_int(myjson_t *arr, size_t idx, int elem);
+void myjson_replace_arr_elem_w_double(myjson_t *arr, size_t idx, double elem);
+void myjson_replace_arr_elem_w_true(myjson_t *arr, size_t idx);
+void myjson_replace_arr_elem_w_false(myjson_t *arr, size_t idx);
+void myjson_replace_arr_elem_w_null(myjson_t *arr, size_t idx);
+void myjson_replace_arr_elem_w_str(myjson_t *arr, size_t idx, char *elem);
+
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
+
 void myjson_update_pair_in_obj(myjson_t *obj, const char *key, const myjson_t *mj);
 void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, const char *val);
 void myjson_update_int_pair_in_obj(myjson_t *obj, const char *key, int val);
