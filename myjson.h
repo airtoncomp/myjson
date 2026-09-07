@@ -72,6 +72,7 @@ void myjson_replace_arr_elem_w_null(myjson_t *arr, size_t idx);
 void myjson_replace_arr_elem_w_str(myjson_t *arr, size_t idx, char *elem);
 
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
+void myjson_del_elem_from_arr(myjson_t *arr, size_t idx);
 
 void myjson_update_pair_in_obj(myjson_t *obj, const char *key, const myjson_t *mj);
 void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, const char *val);

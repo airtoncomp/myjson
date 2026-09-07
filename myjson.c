@@ -2087,3 +2087,23 @@ void myjson_replace_arr_elem_w_str(myjson_t *arr, size_t idx, char *elem)
     mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
     replace_arr_elem(arr_node, idx, node);
 }
+
+void myjson_del_elem_from_arr(myjson_t *arr, size_t idx)
+{
+    if (!arr || !arr->root) {
+        fprintf(stderr, "FAIL: Array cannot be null\n");
+        return;
+    }
+    mj_arr_node_t *arr_node = arr->root->node;
+    if (idx > arr_node->count) {
+        fprintf(stderr, "FAIL: Index out-of-range\n");
+        return;
+    }
+    mj_free_node(mj_arr_node_idx(arr_node, idx));
+    for (size_t i = idx+1 ; i < arr_node->count; i++) {
+        printf("%zu, %p\n", i, (void *) mj_arr_node_idx(arr_node, i));
+        mj_arr_node_idx(arr_node, i-1) = mj_arr_node_idx(arr_node, i);
+    }
+    //mj_free_node(mj_arr_node_idx(arr_node, arr_node->count-1));
+    arr_node->count--;
+}
