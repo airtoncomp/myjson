@@ -55,9 +55,12 @@ void test_object()
     myjson_add_pair_to_obj(obj, false_pair);
     myjson_add_pair_to_obj(obj, null_pair);
 
-    myjson_del_pair_from_obj(obj, MJ_STR("c"));
+    //myjson_del_pair_from_obj(obj, MJ_STR("c"));
     myjson_update_str_pair_in_obj(obj, MJ_STR("f"), "true"); // should fail
     myjson_update_str_pair_in_obj(obj, MJ_STR("a"), MJ_STR("test"));
+    myjson_update_int_pair_in_obj(obj, MJ_STR("b"), 90);
+    myjson_update_double_pair_in_obj(obj, MJ_STR("c"), -12.9);
+    myjson_update_bool_pair_in_obj(obj, MJ_STR("f"), 1);
 
     myjson_add_obj_to_root(&mj, obj);
 
