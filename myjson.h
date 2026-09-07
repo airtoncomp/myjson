@@ -65,11 +65,11 @@ void myjson_append_null_to_arr(myjson_t *arr);
 void myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj);
 
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
-void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, char *val);
+void myjson_update_pair_in_obj(myjson_t *obj, const char *key, const myjson_t *mj);
+void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, const char *val);
 void myjson_update_int_pair_in_obj(myjson_t *obj, const char *key, int val);
 void myjson_update_double_pair_in_obj(myjson_t *obj, const char *key, double val);
 void myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_one);
-//void myjson_update_null_pair_in_obj(myjson_t *obj, const char *key, myjson_t *val);
 
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);

@@ -59,28 +59,28 @@
 
 #define MJ_RET_ERR_ON_NULL(x, fmt, ...) do {                \
             if (x == NULL) {                                \
-                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
+                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
             }                                               \
         } while(0)
 
 #define MJ_RET_ERR_ON_TRUE(x, fmt, ...) do {                \
             if (x) {                                        \
-                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
+                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
             }                                               \
         } while(0)
 
 #define MJ_RET_NULL_ON_TRUE(x, fmt, ...) do {               \
             if (x) {                                        \
-                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
+                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
                 return NULL;                                \
             }                                               \
         } while(0)                                          
 
 #define MJ_RET_ON_ERR(x, fmt, ...) do {                     \
             if (x < 0) {                                    \
-                fprintf(stderr, fmt"\n", ##__VA_ARGS__);    \
+                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
                 return -1;                                  \
             }                                               \
         } while(0)
@@ -826,7 +826,7 @@ static void mj_free_node(mj_node_t *node)
         break;
     }
     default:
-        fprintf(stderr, "Unknown json type\n");
+        fprintf(stderr, "FAIL: Unknown json type\n");
     }
 }
 
@@ -842,7 +842,7 @@ void myjson_free_root(myjson_t *mj)
 
 void myjson_free(myjson_t *mj)
 {
-    if (!mj && !mj->root)
+    if (!mj || !mj->root)
         return;
     free(mj);
     mj = NULL;
@@ -949,7 +949,7 @@ static int remove_pair_node(mj_arr_node_t *arr, const char *key)
     return 0;
 }
 
-static int update_mut_str_pair_node(mj_arr_node_t *arr, const char *key, char *val)
+static int update_mut_str_pair_node(mj_arr_node_t *arr, const char *key, const char *val)
 {
     assert(arr != NULL && "Array cannot be null");
     
@@ -1024,6 +1024,34 @@ static int update_double_pair_node(mj_arr_node_t *arr, const char *key, double v
                             "Destination field is not float point type");
         mj_double_byte_node_t *double_node = node->node;
         double_node->value = val;
+        break;
+    }
+    return 0;
+}
+
+static int update_pair_node(mj_arr_node_t *arr, const char *key, const myjson_t *mj)
+{
+    assert(arr != NULL && "Array cannot be null");
+
+    size_t i = 0;
+    for (; i < arr->count; i++) {
+        mj_pair_node_t *pair_node = mj_arr_node_idx(arr, i)->node;
+        if (pair_node && strncmp(pair_node->key, key, pair_node->keylen) != 0)
+            continue;
+        MJ_RET_ERR_ON_TRUE((mj->root->type != MJ_NODE_OBJECT
+                            && mj->root->type != MJ_NODE_PAIR
+                            && mj->root->type != MJ_NODE_ARRAY
+                            && mj->root->type != MJ_NODE_STRING
+                            && mj->root->type != MJ_NODE_MUT_STRING
+                            && mj->root->type != MJ_NODE_NUMBER
+                            && mj->root->type != MJ_NODE_INT_BYTE
+                            && mj->root->type != MJ_NODE_DOUBLE_BYTE
+                            && mj->root->type != MJ_NODE_BOOL
+                            && mj->root->type != MJ_NODE_MUT_BOOL
+                            && mj->root->type != MJ_NODE_NULL
+                            && mj->root->type != MJ_NODE_MUT_NULL), "Invalid myjson node type");
+        mj_free_node(mj_arr_node_idx(arr, i));
+        mj_arr_node_idx(arr, i) = mj->root;
         break;
     }
     return 0;
@@ -1645,7 +1673,7 @@ static void mj_print_node(const mj_node_t *node)
         mj_print_null_node(node->node);
         break;
     default:
-        fprintf(stderr, "Unknown json type\n");
+        fprintf(stderr, "FAIL: Unknown json type\n");
     }
 }
 
@@ -1797,7 +1825,7 @@ void myjson_del_pair_from_obj(myjson_t *obj, const char *key)
         fprintf(stderr, "Invalid key\n");
         return;
     }
-    if (!obj && !obj->root) {
+    if (!obj || !obj->root) {
         fprintf(stderr, "Null pointer\n");
         return;
     }
@@ -1805,7 +1833,7 @@ void myjson_del_pair_from_obj(myjson_t *obj, const char *key)
     remove_pair_node(&node->members, key);
 }
 
-void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, char *val)
+void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, const char *val)
 {
     if (!key || (key && key[0] == '\0')) {
         fprintf(stderr, "Invalid key\n");
@@ -1815,7 +1843,7 @@ void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, char *val)
         fprintf(stderr, "Invalid value\n");
         return;
     }
-    if (!obj && !obj->root) {
+    if (!obj || !obj->root) {
         fprintf(stderr, "Null pointer\n");
         return;
     }
@@ -1829,7 +1857,7 @@ void myjson_update_int_pair_in_obj(myjson_t *obj, const char *key, int val)
         fprintf(stderr, "Invalid key\n");
         return;
     }
-    if (!obj && !obj->root) {
+    if (!obj || !obj->root) {
         fprintf(stderr, "Null pointer\n");
         return;
     }
@@ -1843,7 +1871,7 @@ void myjson_update_double_pair_in_obj(myjson_t *obj, const char *key, double val
         fprintf(stderr, "Invalid key\n");
         return;
     }
-    if (!obj && !obj->root) {
+    if (!obj || !obj->root) {
         fprintf(stderr, "Null pointer\n");
         return;
     }
@@ -1857,7 +1885,7 @@ void myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_
         fprintf(stderr, "Invalid key\n");
         return;
     }
-    if (!obj && !obj->root) {
+    if (!obj || !obj->root) {
         fprintf(stderr, "Null pointer\n");
         return;
     }
@@ -1865,10 +1893,19 @@ void myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_
     update_bool_pair_node(&node->members, key, zero_or_one);
 }
 
-/*void myjson_update_null_pair_in_obj(myjson_t *obj, const char *key, myjson_t *val)
+void myjson_update_pair_in_obj(myjson_t *obj, const char *key, const myjson_t *mj)
 {
-    //TODO: a field that is null can assume any type as new value of key
-}*/
+    if (!key || (key && key[0] == '\0')) {
+        fprintf(stderr, "Invalid key\n");
+        return;
+    }
+    if (!obj || !obj->root) {
+        fprintf(stderr, "Null pointer\n");
+        return;
+    }
+    mj_obj_node_t *node = obj->root->node;
+    update_pair_node(&node->members, key, mj);
+}
 
 void myjson_append_str_to_arr(myjson_t *arr, char *val)
 {
