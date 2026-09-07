@@ -65,6 +65,7 @@ void myjson_append_null_to_arr(myjson_t *arr);
 void myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj);
 
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
+void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, char *val);
 
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);
