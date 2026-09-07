@@ -56,6 +56,8 @@ void test_object()
     myjson_add_pair_to_obj(obj, null_pair);
 
     myjson_del_pair_from_obj(obj, MJ_STR("c"));
+    myjson_update_str_pair_in_obj(obj, MJ_STR("f"), "true"); // should fail
+    myjson_update_str_pair_in_obj(obj, MJ_STR("a"), MJ_STR("test"));
 
     myjson_add_obj_to_root(&mj, obj);
 
@@ -97,6 +99,8 @@ void test_array()
 
     myjson_print(mj);
 
+    myjson_free(str_pair);
+    myjson_free(obj);
     myjson_free(arr);
     myjson_free_root(mj);
 
