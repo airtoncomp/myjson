@@ -55,7 +55,7 @@ void test_object()
     myjson_add_pair_to_obj(obj, false_pair);
     myjson_add_pair_to_obj(obj, null_pair);
 
-    //myjson_del_pair_from_obj(obj, MJ_STR("c"));
+    myjson_del_pair_from_obj(obj, MJ_STR("c"));
     myjson_update_str_pair_in_obj(obj, MJ_STR("f"), "true"); // should fail
     myjson_update_str_pair_in_obj(obj, MJ_STR("a"), MJ_STR("test"));
     myjson_update_int_pair_in_obj(obj, MJ_STR("b"), 90);
@@ -73,6 +73,32 @@ void test_object()
     myjson_free(true_pair);
     myjson_free(false_pair);
     myjson_free(null_pair);
+    myjson_free_root(mj);
+
+    printf("\n--- END: TEST OBJECT CREATION ---\n");
+}
+
+void test_object2()
+{
+    printf("\n--- BEGIN: TEST OBJECT CREATION ---\n");
+
+    myjson_t *mj = myjson_create_root();
+    myjson_t *obj = myjson_create_obj(1);
+
+    myjson_t *int_pair = myjson_create_pair_int(MJ_STR("b"), 45);
+
+    myjson_add_pair_to_obj(obj, int_pair);
+
+    myjson_add_obj_to_root(&mj, obj);
+
+    myjson_t *new_int_pair = myjson_create_pair_int(MJ_STR("b"), 234);
+    myjson_update_pair_in_obj(obj, MJ_STR("b"), new_int_pair);
+
+    myjson_print(mj);
+
+    myjson_free(obj);
+    myjson_free(int_pair);
+    myjson_free(new_int_pair);
     myjson_free_root(mj);
 
     printf("\n--- END: TEST OBJECT CREATION ---\n");
@@ -116,6 +142,9 @@ int main ()
     printf("\n");
 
     test_object();
+    printf("\n");
+
+    test_object2();
     printf("\n");
 
     test_array();
