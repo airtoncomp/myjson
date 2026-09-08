@@ -83,6 +83,5 @@ void myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);
 void myjson_free_root(myjson_t *mj);
-void myjson_free(myjson_t *mj);
 
 #endif
