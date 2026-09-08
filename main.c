@@ -65,13 +65,6 @@ void test_object()
 
     myjson_print(mj);
 
-    myjson_free(obj);
-    myjson_free(str_pair);
-    myjson_free(int_pair);
-    myjson_free(double_pair);
-    myjson_free(true_pair);
-    myjson_free(false_pair);
-    myjson_free(null_pair);
     myjson_free_root(mj);
 
     printf("\n--- END: TEST OBJECT CREATION ---\n");
@@ -95,9 +88,6 @@ void test_object2()
 
     myjson_print(mj);
 
-    myjson_free(obj);
-    myjson_free(int_pair);
-    myjson_free(new_int_pair);
     myjson_free_root(mj);
 
     printf("\n--- END: TEST OBJECT CREATION ---\n");
@@ -136,9 +126,6 @@ void test_array()
 
     myjson_print(mj);
 
-    myjson_free(str_pair);
-    myjson_free(obj);
-    myjson_free(arr);
     myjson_free_root(mj);
 
     printf("\n--- END: TEST ARRAY CREATION ---\n");
