@@ -525,6 +525,7 @@ typedef enum {
  */
 typedef struct {
     void            *node;
+    myjson_t        *wrapper;
     mjnode_type_t   type;
 } mj_node_t;
 
@@ -762,66 +763,86 @@ static void mj_free_mut_null_node(mj_mut_null_node_t *node)
     free(node);
 }
 
+static void mj_free_wrapper(mj_node_t *node)
+{
+    if (node->wrapper) { 
+        free(node->wrapper);
+        node->wrapper = NULL;
+    }
+}
+
 static void mj_free_node(mj_node_t *node)
 {
     switch(node->type) {
     case MJ_NODE_OBJECT: {
         mj_free_obj_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_ARRAY: {
         mj_free_arr_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_STRING: {
         mj_free_str_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_MUT_STRING: {
         mj_free_mut_str_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_PAIR: {
         mj_free_pair_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_NUMBER: {
         mj_free_num_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_INT_BYTE: {
         mj_free_int_byte_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_DOUBLE_BYTE: {
         mj_free_double_byte_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_BOOL: {
         mj_free_bool_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_MUT_BOOL: {
         mj_free_mut_bool_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_NULL: {
         mj_free_null_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
     case MJ_NODE_MUT_NULL: {
         mj_free_mut_null_node(node->node);
+        mj_free_wrapper(node);
         free(node);
         break;
     }
@@ -840,13 +861,6 @@ void myjson_free_root(myjson_t *mj)
     mj = NULL;
 }
 
-void myjson_free(myjson_t *mj)
-{
-    if (!mj || !mj->root)
-        return;
-    free(mj);
-    mj = NULL;
-}
 
 /**
  * MyJSON node allocator
@@ -932,8 +946,7 @@ static int remove_pair_node(mj_arr_node_t *arr, const char *key)
         mj_pair_node_t *node = mj_arr_node_idx(arr, i)->node;
         if (node && strncmp(node->key, key, node->keylen) != 0)
             continue;
-        mj_free_pair_node(node);
-        free(mj_arr_node_idx(arr, i));
+        mj_free_node(mj_arr_node_idx(arr, i));
         mj_arr_node_idx(arr, i) = NULL;
         break;
     }
@@ -1150,11 +1163,12 @@ static mj_pair_node_t *alloc_pair_node(const char *key, size_t keylen, mj_node_t
     return pair_node;
 }
 
-static mj_node_t *alloc_node(void *child, mjnode_type_t type)
+static mj_node_t *alloc_node(void *child, mjnode_type_t type, myjson_t *wrapper)
 {
     mj_node_t *node = malloc(sizeof(*node));
     node->node = child;
     node->type = type;
+    node->wrapper = wrapper;
     return node;
 }
 
@@ -1198,7 +1212,7 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
         }
 
         mj_pair_node_t *pair_node = alloc_pair_node(frame->pending_key, frame->pending_keylen, node);
-        mj_node_t *new_node = alloc_node(pair_node, MJ_NODE_PAIR);
+        mj_node_t *new_node = alloc_node(pair_node, MJ_NODE_PAIR, NULL);
 
         mj_obj_node_t *obj_node = frame->node->node;
         append_mj_node(&obj_node->members, new_node);
@@ -1214,7 +1228,7 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
 static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
 {
     mj_obj_node_t *obj_node = alloc_obj_node(MJ_ARRAY_NODE_INIT_CAP);
-    mj_node_t *node = alloc_node(obj_node, MJ_NODE_OBJECT);
+    mj_node_t *node = alloc_node(obj_node, MJ_NODE_OBJECT, NULL);
 
     if (attach_node(stack, node, root) < 0) {
         mj_free_obj_node(obj_node);
@@ -1277,7 +1291,7 @@ static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *
 {
     if (is_frame_stack_empty(stack)) {
         mj_str_node_t *str_node = alloc_str_node(val, val_len);
-        mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+        mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING, NULL);
         attach_node(stack, node, root);
         return;
     }
@@ -1299,7 +1313,7 @@ static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *
         }
         if (mj_frame_state(frame) == OBJ_EXPECT_VAL) {
             mj_str_node_t *str_node = alloc_str_node(val, val_len);
-            mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+            mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING, NULL);
             attach_node(stack, node, root);
             return;
         }
@@ -1309,7 +1323,7 @@ static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *
 
     if (mj_frame_type(frame) == ARR_FRAME) {
         mj_str_node_t *str_node = alloc_str_node(val, val_len);
-        mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+        mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING, NULL);
         attach_node(stack, node, root);
     }
 }
@@ -1339,21 +1353,21 @@ static void mj_parse_colon(mj_frame_stack_t *stack)
 static void mj_parse_num(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
     mj_num_node_t *num_node = alloc_num_node(val, val_len);
-    mj_node_t *node = alloc_node(num_node, MJ_NODE_NUMBER);
+    mj_node_t *node = alloc_node(num_node, MJ_NODE_NUMBER, NULL);
     attach_node(stack, node, root);
 }
 
 static void mj_parse_bool(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
     mj_bool_node_t *bool_node = alloc_bool_node(val, val_len);
-    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL, NULL);
     attach_node(stack, node, root);
 }
 
 static void mj_parse_null(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
 {
     mj_null_node_t *null_node = alloc_null_node(val, val_len);
-    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
+    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL, NULL);
     attach_node(stack, node, root);
 }
 
@@ -1388,7 +1402,7 @@ static void mj_parse_comma(mj_frame_stack_t *stack)
 static void mj_parse_arr_start(mj_frame_stack_t *stack, mj_node_t **root)
 {
     mj_arr_node_t *arr_node = alloc_arr_node(MJ_ARRAY_NODE_INIT_CAP);
-    mj_node_t *node = alloc_node(arr_node, MJ_NODE_ARRAY);
+    mj_node_t *node = alloc_node(arr_node, MJ_NODE_ARRAY, NULL);
 
     if (attach_node(stack, node, root) < 0) {
         mj_free_arr_node(arr_node);
@@ -1707,14 +1721,14 @@ inline myjson_t *myjson_create_root()
 myjson_t *myjson_create_obj(size_t cap)
 {
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(alloc_obj_node(cap), MJ_NODE_OBJECT);
+    mj->root = alloc_node(alloc_obj_node(cap), MJ_NODE_OBJECT, mj);
     return mj;
 }
 
 myjson_t *myjson_create_arr(size_t cap)
 {
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(alloc_arr_node(cap), MJ_NODE_ARRAY);
+    mj->root = alloc_node(alloc_arr_node(cap), MJ_NODE_ARRAY, mj);
     return mj;
 }
 
@@ -1724,10 +1738,10 @@ myjson_t *myjson_create_pair_str(const char *key, char *val)
     MJ_RET_NULL_ON_TRUE(!val || (val && val[0] == '\0'), "Invalid value");
     
     mj_mut_str_node_t *str_node = alloc_mut_str_node(val, strlen(val));
-    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_MUT_STRING));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(str_node, MJ_NODE_MUT_STRING, NULL));
 
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR, mj);
 
     return mj;
 }
@@ -1737,10 +1751,10 @@ myjson_t *myjson_create_pair_int(const char *key, int val)
     MJ_RET_NULL_ON_TRUE(!key || (key && key[0] == '\0'), "Invalid key");
 
     mj_int_byte_node_t *int_node = alloc_int_byte_node(val);
-    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(int_node, MJ_NODE_INT_BYTE));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(int_node, MJ_NODE_INT_BYTE, NULL));
 
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR, mj);
 
     return mj;
 }
@@ -1749,11 +1763,11 @@ myjson_t *myjson_create_pair_double(const char *key, double val)
 {
     MJ_RET_NULL_ON_TRUE(!key || (key && key[0] == '\0'), "Invalid key");
 
-    mj_double_byte_node_t *int_node = alloc_double_byte_node(val);
-    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(int_node, MJ_NODE_DOUBLE_BYTE));
+    mj_double_byte_node_t *double_node = alloc_double_byte_node(val);
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(double_node, MJ_NODE_DOUBLE_BYTE, NULL));
 
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR, mj);
 
     return mj;
 }
@@ -1761,10 +1775,10 @@ myjson_t *myjson_create_pair_double(const char *key, double val)
 myjson_t *myjson_create_pair_true(const char *key)
 {
     mj_mut_bool_node_t *bool_node = alloc_mut_bool_node("true", strlen("true"));
-    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(bool_node, MJ_NODE_MUT_BOOL));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(bool_node, MJ_NODE_MUT_BOOL, NULL));
 
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR, mj);
 
     return mj;
 }
@@ -1772,10 +1786,10 @@ myjson_t *myjson_create_pair_true(const char *key)
 myjson_t *myjson_create_pair_false(const char *key)
 {
     mj_mut_bool_node_t *bool_node = alloc_mut_bool_node("false", strlen("false"));
-    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(bool_node, MJ_NODE_MUT_BOOL));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(bool_node, MJ_NODE_MUT_BOOL, NULL));
 
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR, mj);
 
     return mj;
 }
@@ -1783,10 +1797,10 @@ myjson_t *myjson_create_pair_false(const char *key)
 myjson_t *myjson_create_pair_null(const char *key)
 {
     mj_mut_null_node_t *null_node = alloc_mut_null_node("null", strlen("null"));
-    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(null_node, MJ_NODE_MUT_NULL));
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), alloc_node(null_node, MJ_NODE_MUT_NULL, NULL));
 
     myjson_t *mj = malloc(sizeof(*mj));
-    mj->root = alloc_node(pair_node, MJ_NODE_PAIR);
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR, mj);
 
     return mj;
 }
@@ -1918,7 +1932,7 @@ void myjson_append_str_to_arr(myjson_t *arr, char *val)
         return;
     }
     mj_str_node_t *str_node = alloc_str_node(val, strlen(val));
-    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING, NULL);
     append_mj_node(arr->root->node, node);
 }
 
@@ -1929,7 +1943,7 @@ void myjson_append_int_to_arr(myjson_t *arr, int val)
         return;
     }
     mj_int_byte_node_t *int_node = alloc_int_byte_node(val);
-    mj_node_t *node = alloc_node(int_node, MJ_NODE_INT_BYTE);
+    mj_node_t *node = alloc_node(int_node, MJ_NODE_INT_BYTE, NULL);
     append_mj_node(arr->root->node, node);
 }
 
@@ -1940,7 +1954,7 @@ void myjson_append_double_to_arr(myjson_t *arr, double val)
         return;
     }
     mj_double_byte_node_t *double_node = alloc_double_byte_node(val);
-    mj_node_t *node = alloc_node(double_node, MJ_NODE_DOUBLE_BYTE);
+    mj_node_t *node = alloc_node(double_node, MJ_NODE_DOUBLE_BYTE, NULL);
     append_mj_node(arr->root->node, node);
 }
 
@@ -1951,7 +1965,7 @@ void myjson_append_true_to_arr(myjson_t *arr)
         return;
     }
     mj_bool_node_t *bool_node = alloc_bool_node("true", strlen("true"));
-    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL, NULL);
     append_mj_node(arr->root->node, node);
 }
 
@@ -1962,7 +1976,7 @@ void myjson_append_false_to_arr(myjson_t *arr)
         return;
     }
     mj_bool_node_t *bool_node = alloc_bool_node("false", strlen("false"));
-    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL, NULL);
     append_mj_node(arr->root->node, node);
 }
 
@@ -1973,7 +1987,7 @@ void myjson_append_null_to_arr(myjson_t *arr)
         return;
     }
     mj_null_node_t *null_node = alloc_null_node("null", strlen("null"));
-    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
+    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL, NULL);
     append_mj_node(arr->root->node, node);
 }
 
@@ -2004,7 +2018,7 @@ void myjson_replace_arr_elem_w_int(myjson_t *arr, size_t idx, int elem)
         return;
     }
     mj_int_byte_node_t *int_node = alloc_int_byte_node(elem);
-    mj_node_t *node = alloc_node(int_node, MJ_NODE_INT_BYTE);
+    mj_node_t *node = alloc_node(int_node, MJ_NODE_INT_BYTE, NULL);
     replace_arr_elem(arr_node, idx, node);
 }
 
@@ -2020,7 +2034,7 @@ void myjson_replace_arr_elem_w_double(myjson_t *arr, size_t idx, double elem)
         return;
     }
     mj_double_byte_node_t *double_node = alloc_double_byte_node(elem);
-    mj_node_t *node = alloc_node(double_node, MJ_NODE_DOUBLE_BYTE);
+    mj_node_t *node = alloc_node(double_node, MJ_NODE_DOUBLE_BYTE, NULL);
     replace_arr_elem(arr_node, idx, node);
 }
 
@@ -2036,7 +2050,7 @@ void myjson_replace_arr_elem_w_true(myjson_t *arr, size_t idx)
         return;
     }
     mj_bool_node_t *bool_node = alloc_bool_node("true", strlen("true"));
-    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL, NULL);
     replace_arr_elem(arr_node, idx, node);
 }
 
@@ -2052,7 +2066,7 @@ void myjson_replace_arr_elem_w_false(myjson_t *arr, size_t idx)
         return;
     }
     mj_bool_node_t *bool_node = alloc_bool_node("false", strlen("false"));
-    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL);
+    mj_node_t *node = alloc_node(bool_node, MJ_NODE_BOOL, NULL);
     replace_arr_elem(arr_node, idx, node);
 }
 
@@ -2068,7 +2082,7 @@ void myjson_replace_arr_elem_w_null(myjson_t *arr, size_t idx)
         return;
     }
     mj_null_node_t *null_node = alloc_null_node("null", strlen("null"));
-    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL);
+    mj_node_t *node = alloc_node(null_node, MJ_NODE_NULL, NULL);
     replace_arr_elem(arr_node, idx, node);
 }
 
@@ -2084,7 +2098,7 @@ void myjson_replace_arr_elem_w_str(myjson_t *arr, size_t idx, char *elem)
         return;
     }
     mj_str_node_t *str_node = alloc_str_node(elem, strlen(elem));
-    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING);
+    mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING, NULL);
     replace_arr_elem(arr_node, idx, node);
 }
 
@@ -2101,9 +2115,8 @@ void myjson_del_elem_from_arr(myjson_t *arr, size_t idx)
     }
     mj_free_node(mj_arr_node_idx(arr_node, idx));
     for (size_t i = idx+1 ; i < arr_node->count; i++) {
-        printf("%zu, %p\n", i, (void *) mj_arr_node_idx(arr_node, i));
         mj_arr_node_idx(arr_node, i-1) = mj_arr_node_idx(arr_node, i);
     }
-    //mj_free_node(mj_arr_node_idx(arr_node, arr_node->count-1));
+    mj_arr_node_idx(arr_node, arr_node->count) = NULL;
     arr_node->count--;
 }
