@@ -529,8 +529,9 @@ typedef struct {
     mjnode_type_t   type;
 } mj_node_t;
 
-#define MJ_ARRAY_NODE_INIT_CAP        100
-#define MJ_NODE_ARRAY_GROWTH_FACTOR   2
+#define MJ_ARRAY_NODE_INIT_CAP          100
+#define MJ_NODE_ARRAY_GROWTH_FACTOR     2
+#define MJ_NODE_ARRAY_ALLOW_GROWTH      1
 
 /**
  * Dynamic array of 'mj_node_t *'
@@ -637,7 +638,7 @@ typedef struct {
     mj_frame_t  *frames;
     size_t      count;
     size_t      cap;
-    int         allow_growth; //TODO
+    int         allow_growth;
 } mj_frame_stack_t;
 
 #define MJ_FRAME_STACK_INIT_CAP         1000
@@ -659,6 +660,7 @@ static void mj_free_mut_bool_node(mj_mut_bool_node_t *node);
 static void mj_free_null_node(mj_null_node_t *node);
 static void mj_free_mut_null_node(mj_mut_null_node_t *node);
 static void mj_free_node(mj_node_t *node);
+static void mj_free_wrapper(mj_node_t *node);
 
 static void mj_free_obj_node(mj_obj_node_t *node)
 {
@@ -916,14 +918,15 @@ static void init_mj_arr_node(mj_arr_node_t *arr, size_t cap)
 
     arr->arr = calloc(cap, sizeof(*arr->arr));
     arr->count = 0;
-    arr->cap = cap;
+    arr->cap = cap == 0 ? MJ_ARRAY_NODE_INIT_CAP : cap;
+    arr->allow_growth = MJ_NODE_ARRAY_ALLOW_GROWTH;
 }
 
 static int append_mj_node(mj_arr_node_t *arr, mj_node_t *node)
 {
     assert(arr != NULL && "Array cannot be null");
 
-    if (arr->count >= arr->cap) {
+    if (arr->count >= arr->cap && arr->allow_growth) {
         size_t new_cap = arr->cap * MJ_NODE_ARRAY_GROWTH_FACTOR;
         mj_node_t **tmp = realloc(arr->arr, new_cap * sizeof(arr->arr));
         MJ_RET_ERR_ON_NULL(tmp, "Out of memory failure");
