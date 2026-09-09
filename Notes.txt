@@ -1,0 +1,90 @@
+Memory Allocation
+==================
+
+MyJSON uses a hierarchy of types allocated dynamically in memory.
+
+The myjson_t type is the public interface exposed to users for building and
+manipulating JSON values. Internally, the library uses mj_node_t as a generic
+container that serves as the base representation for more specialized node
+types, such as string, boolean, object, and array nodes.
+
+Each specialized node stores the data and state required by its corresponding
+JSON type, while mj_node_t provides a common representation that allows the
+library to handle different node types through a unified interface.
+
++-------------------+
+| myjson_t          |
+|                   |
+|   +-------------+ |
+|   | mj_node_t * | |--------------------------+
+|   | root        | |                          |
+|   +-------------+ |                          v
++-------------------+                +----------------------+
+          ^                          | mj_node_t            |
+          |                          |                      |
+          |                          |  +----------------+  |
+          |                          |  | void *node     |--+-------------------+
+          |                          |  +----------------+  |                   |
+          |                          |                      |                   |
+          +--------------------------|- +----------------+  |                   |
+                                     |  | myjson_t       |  |                   |
+                                     |  | *wrapper       |  |                   |
+                                     |  +----------------+  |                   |
+                                     +----------------------+                   |
+                                                                                v
+                                                        +--------------------------+
+                                                        | mj_str_node_t            |
+                                                        +--------------------------+
+                                                        | mj_mut_str_node_t        |
+                                                        +--------------------------+
+                                                        | mj_num_node_t            |
+                                                        +--------------------------+
+                                                        | mj_int_byte_node_t       |
+                                                        +--------------------------+
+                                                        | mj_double_byte_node_t    |
+                                                        +--------------------------+
+                                                        | mj_bool_node_t           |
+                                                        +--------------------------+
+                                                        | mj_null_node_t           |
+                                                        +--------------------------+
+                                                        | mj_pair_node_t           |
+                                                        +--------------------------+
+                                                        | mj_obj_node_t            |
+                                                        +--------------------------+
+                                                        | mj_arr_node_t            |
+                                                        +--------------------------+
+
+Node Memory Management
+======================
+
+Nodes are dynamically allocated by the myjson_create_X() functions, which
+return pointers of type myjson_t *. All nodes belonging to a JSON tree are
+owned by its root node and are released recursively when myjson_free_root()
+is called.
+
+For example:
+
+myjson_t *root = myjson_create_root();
+myjson_t *obj = myjson_create_obj(1);
+myjson_t *int_pair = myjson_create_pair_int(MJ_STR("b"), 45);
+
+/* Attach child nodes to their respective parent nodes. */
+
+myjson_add_obj_to_root(&root, obj);
+
+myjson_print(root);
+myjson_free_root(root);
+
+Each JSON tree must have exactly one root node. Every other node must eventually
+be attached to a parent node, either directly or indirectly, forming a hierarchy
+that terminates at the root.
+
+The root is also represented by myjson_t, but unlike other nodes, it has no
+parent.
+
+Once a node has been attached to the tree, its lifetime is managed by the root.
+The user should therefore call myjson_free_root(root) when the JSON tree is no
+longer needed. This recursively releases the root and all child nodes attached
+to it.
+
+
