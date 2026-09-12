@@ -1808,6 +1808,16 @@ myjson_t *myjson_create_pair_null(const char *key)
     return mj;
 }
 
+myjson_t *myjson_create_pair_arr(const char *key, myjson_t *arr)
+{
+    mj_pair_node_t *pair_node = alloc_pair_node(key, strlen(key), arr->root);
+
+    myjson_t *mj = malloc(sizeof(*mj));
+    mj->root = alloc_node(pair_node, MJ_NODE_PAIR, mj);
+
+    return mj;
+}
+
 void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair)
 {
     if (obj->root->type != MJ_NODE_OBJECT) {
@@ -1818,22 +1828,22 @@ void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair)
     append_mj_node(&node->members, pair->root);
 }
 
-void myjson_add_obj_to_root(myjson_t **root, myjson_t *obj)
+void myjson_add_obj_to_root(myjson_t *root, myjson_t *obj)
 {
-    if ((*root)->root) {
+    if (root->root) {
         fprintf(stderr, "Unexpected extra json value after root\n");
         return;
     }
-    (*root)->root = obj->root;
+    root->root = obj->root;
 }
 
-void myjson_add_arr_to_root(myjson_t **root, myjson_t *arr)
+void myjson_add_arr_to_root(myjson_t *root, myjson_t *arr)
 {
-    if ((*root)->root) {
+    if (root->root) {
         fprintf(stderr, "Unexpected extra json value after root\n");
         return;
     }
-    (*root)->root = arr->root;
+    root->root = arr->root;
 }
 
 void myjson_del_pair_from_obj(myjson_t *obj, const char *key)
