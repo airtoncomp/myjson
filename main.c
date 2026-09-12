@@ -12,18 +12,19 @@ void test()
 {
     printf("\n--- BEGIN: TEST TOKENIZER AND PARSER ---\n");
 
-    //char *str = R"({"a":"b", "c":[], "d":1, "e":2.4, "f":0.0e10})";
-    //char *str = "{\"a\":\"b\", \"c\":[]}";
-    //char *str = R"({"a":0.0e12, "b":0.1E-56, "c":2.5e+4, "d":6e7})";
-    //char *str = R"({"a":true, "b":false, "c":null})";
-    //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
-    //char *str = R"({"a":true, "b":{"mykey":"myval"}, "c":null})";
-    //char *str = R"({"a":true})";
-    //char *str = R"({"a":[true]})";
-    //char *str = R"({"a":[{"b":"c"},{"d":true}, "elem"]})";
-    //char *str = R"(["a",true])";
-    //char *str = R"({"a":"c"})";
-    char *str = R"({"a":2})";
+    //const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10}";
+    //const char *str = "{\"a\":\"b\", \"c\":[]}";
+    //const char *str = "{\"a\":0.0e12, \"b\":0.1E-56, \"c\":2.5e+4, \"d\":6e7}";
+    //const char *str = "{\"a\":true, \"b\":false, \"c\":null}";
+    //const char *str = "{\"a\":true, \"b\":{\"mykey\":\"myval\"}, \"c\":null}";
+    //const char *str = "{\"a\":true, \"b\":{\"mykey\":\"myval\"}, \"c\":null}";
+    //const char *str = "{\"a\":true}";
+    //const char *str = "{\"a\":[true]}";
+    //const char *str = "{\"a\":[{\"b\":\"c\"},{\"d\":true}, \"elem\"]}";
+    //const char *str = "[\"a\",true]";
+    //const char *str = "{\"a\":\"c\"}";
+    //const char *str = "{\"a\":2}";
+    const char *str = "{\"a\":[{\"b\":\"c\"},{\"d\":true},\"elem\"]}";
 
     printf("%s\n", str);
 
