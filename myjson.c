@@ -57,38 +57,46 @@
 
 #endif
 
-#define MJ_RET_ERR_ON_NULL(x, fmt, ...) do {                \
-            if (x == NULL) {                                \
-                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
-                return -1;                                  \
-            }                                               \
+#define MJ_RET_ERR_ON_NULL(x, ...) do {             \
+            if (x == NULL) {                        \
+                fprintf(stderr, "FAIL: ");          \
+                fprintf(stderr, __VA_ARGS__);       \
+                fputc('\n', stderr);                \
+                return -1;                          \
+            }                                       \
         } while(0)
 
-#define MJ_RET_ERR_ON_TRUE(x, fmt, ...) do {                \
-            if (x) {                                        \
-                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
-                return -1;                                  \
-            }                                               \
+#define MJ_RET_ERR_ON_TRUE(x, ...) do {             \
+            if (x) {                                \
+                fprintf(stderr, "FAIL: ");          \
+                fprintf(stderr, __VA_ARGS__);       \
+                fputc('\n', stderr);                \
+                return -1;                          \
+            }                                       \
         } while(0)
 
-#define MJ_RET_NULL_ON_TRUE(x, fmt, ...) do {               \
-            if (x) {                                        \
-                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
-                return NULL;                                \
-            }                                               \
+#define MJ_RET_NULL_ON_TRUE(x, ...) do {            \
+            if (x) {                                \
+                fprintf(stderr, "FAIL: ");          \
+                fprintf(stderr, __VA_ARGS__);       \
+                fputc('\n', stderr);                \
+                return NULL;                        \
+            }                                       \
         } while(0)                                          
 
-#define MJ_RET_ON_ERR(x, fmt, ...) do {                     \
-            if (x < 0) {                                    \
-                fprintf(stderr, "FAIL: "fmt"\n", ##__VA_ARGS__);    \
-                return -1;                                  \
-            }                                               \
+#define MJ_RET_ON_ERR(x, ...) do {                  \
+            if (x < 0) {                            \
+                fprintf(stderr, "FAIL: ");          \
+                fprintf(stderr, __VA_ARGS__);       \
+                fputc('\n', stderr);                \
+                return -1;                          \
+            }                                       \
         } while(0)
 
-#define MJ_RET_ON_ERR2(x) do {                              \
-            if (x < 0) {                                    \
-                return -1;                                  \
-            }                                               \
+#define MJ_RET_ON_ERR2(x) do {                      \
+            if (x < 0) {                            \
+                return -1;                          \
+            }                                       \
         } while(0)
 
 
