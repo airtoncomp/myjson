@@ -608,20 +608,16 @@ typedef struct {
     } frame_type;
 
     enum {
-        OBJ_EXPECT_FIRST_KEY_OR_END,
-        OBJ_EXPECT_KEY,
+        OBJ_EXPECT_KEY_OR_END,
         OBJ_EXPECT_COLON,
         OBJ_EXPECT_VAL,
         OBJ_EXPECT_COMMA_OR_END,
-        ARR_EXPECT_FIRST_VAL_OR_END,
+        ARR_EXPECT_VAL_OR_END,
         ARR_EXPECT_VAL,
         ARR_EXPECT_COMMA_OR_END
     } frame_state;
    
     mj_node_t   *node;
-    const char  *pending_key;
-    size_t      pending_keylen;
-
 } mj_frame_t;
 
 typedef struct {
@@ -890,8 +886,6 @@ static void pop_frame(mj_frame_stack_t *stack)
     if (stack->count > 0) {
         size_t curr = stack->count - 1;
         stack->frames[curr].node = NULL;
-        stack->frames[curr].pending_key = NULL;
-        stack->frames[curr].pending_keylen = 0;
         stack->count--;
     }
 }
@@ -1183,7 +1177,7 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
     mj_frame_t *frame = &mj_frame_stack_top(stack);
 
     if (mj_frame_type(frame) == ARR_FRAME) {
-        if (mj_frame_state(frame) != ARR_EXPECT_FIRST_VAL_OR_END &&
+        if (mj_frame_state(frame) != ARR_EXPECT_VAL_OR_END &&
             mj_frame_state(frame) != ARR_EXPECT_VAL) {
             fprintf(stderr, "Unexpected value in array\n");
             return -1;
@@ -1199,20 +1193,22 @@ static int attach_node(mj_frame_stack_t *stack, mj_node_t *node, mj_node_t **roo
     }
 
     if (mj_frame_type(frame) == OBJ_FRAME) {
-        if (mj_frame_state(frame) != OBJ_EXPECT_VAL) {
-            fprintf(stderr, "Unexpected value in object\n");
-            return -1;
+        if (mj_frame_state(frame) == OBJ_EXPECT_KEY_OR_END) {
+            mj_str_node_t *strkey_node = node->node;
+            mj_pair_node_t *pair_node = alloc_pair_node(strkey_node->value, strkey_node->len, NULL); // still waiting value
+            mj_node_t *new_node = alloc_node(pair_node, MJ_NODE_PAIR, NULL);
+            mj_obj_node_t *obj_node = frame->node->node;
+            append_mj_node(&obj_node->members, new_node);
+            frame->frame_state = OBJ_EXPECT_COLON;
+            return 0;
         }
-
-        mj_pair_node_t *pair_node = alloc_pair_node(frame->pending_key, frame->pending_keylen, node);
-        mj_node_t *new_node = alloc_node(pair_node, MJ_NODE_PAIR, NULL);
-
-        mj_obj_node_t *obj_node = frame->node->node;
-        append_mj_node(&obj_node->members, new_node);
-
-        frame->pending_key = NULL;
-        frame->pending_keylen = 0;
-        frame->frame_state = OBJ_EXPECT_COMMA_OR_END;
+        if (mj_frame_state(frame) == OBJ_EXPECT_VAL) {
+            mj_obj_node_t *obj_node = frame->node->node;
+            mj_node_t *curr_node = obj_node->members.arr[obj_node->members.count - 1];
+            mj_pair_node_t *pair_node = curr_node->node;
+            pair_node->value = node;
+            frame->frame_state = OBJ_EXPECT_COMMA_OR_END;
+        }
     }
 
     return 0;
@@ -1232,9 +1228,7 @@ static void mj_parse_obj_start(mj_frame_stack_t *stack, mj_node_t **root)
     mj_frame_t frame;
     frame.node = node;
     frame.frame_type = OBJ_FRAME;
-    frame.frame_state = OBJ_EXPECT_FIRST_KEY_OR_END;
-    frame.pending_key = NULL;
-    frame.pending_keylen = 0;
+    frame.frame_state = OBJ_EXPECT_KEY_OR_END; 
 
     if (push_frame(stack, frame) < 0) {
         mj_free_obj_node(obj_node);
@@ -1256,7 +1250,7 @@ static void mj_parse_obj_end(mj_frame_stack_t *stack)
         return;
     }
 
-    if (mj_frame_state(frame) == OBJ_EXPECT_FIRST_KEY_OR_END) {
+    if (mj_frame_state(frame) == OBJ_EXPECT_KEY_OR_END) {
         pop_frame(stack);
         return;
     }
@@ -1266,18 +1260,17 @@ static void mj_parse_obj_end(mj_frame_stack_t *stack)
         return;
     }
 
-    if (mj_frame_state(frame) == OBJ_EXPECT_KEY) {
-        fprintf(stderr, "Expected object key after ','\n");
-        return;
-    }
-
     if (mj_frame_state(frame) == OBJ_EXPECT_COLON) {
         fprintf(stderr, "Expected ':' after object key\n");
         return;
     }
 
-    if (mj_frame_state(frame) == OBJ_EXPECT_VAL)
+    if (mj_frame_state(frame) == OBJ_EXPECT_VAL) {
         fprintf(stderr, "Expected value after ':'\n");
+        return;
+    }
+
+    fprintf(stderr, "Unexpected character in json string\n");
 }
 
 static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *val, size_t val_len)
@@ -1292,16 +1285,11 @@ static void mj_parse_str(mj_frame_stack_t *stack, mj_node_t **root, const char *
     mj_frame_t *frame = &mj_frame_stack_top(stack);
     
     if (mj_frame_type(frame) == OBJ_FRAME) {
-        if (mj_frame_state(frame) == OBJ_EXPECT_FIRST_KEY_OR_END) {
-            frame->pending_key = val;
-            frame->pending_keylen = val_len;
-            frame->frame_state = OBJ_EXPECT_COLON;
-            return;
-        }
-        if (mj_frame_state(frame) == OBJ_EXPECT_KEY) {
-            frame->pending_key = val;
-            frame->pending_keylen = val_len;
-            frame->frame_state = OBJ_EXPECT_COLON;
+        if (mj_frame_state(frame) == OBJ_EXPECT_KEY_OR_END) {
+            mj_str_node_t *str_node = alloc_str_node(val, val_len);
+            mj_node_t *node = alloc_node(str_node, MJ_NODE_STRING, NULL);
+            attach_node(stack, node, root);
+            mj_free_node(node);
             return;
         }
         if (mj_frame_state(frame) == OBJ_EXPECT_VAL) {
@@ -1378,7 +1366,7 @@ static void mj_parse_comma(mj_frame_stack_t *stack)
             fprintf(stderr, "Unexpected ',' in object\n");
             return;
         }
-        frame->frame_state = OBJ_EXPECT_KEY;
+        frame->frame_state = OBJ_EXPECT_KEY_OR_END;
         return;
     }
 
@@ -1406,7 +1394,7 @@ static void mj_parse_arr_start(mj_frame_stack_t *stack, mj_node_t **root)
     mj_frame_t frame;
     frame.node = node;
     frame.frame_type = ARR_FRAME;
-    frame.frame_state = ARR_EXPECT_FIRST_VAL_OR_END;
+    frame.frame_state = ARR_EXPECT_VAL_OR_END;
 
     if (push_frame(stack, frame) < 0) {
         mj_free_arr_node(arr_node);
@@ -1428,7 +1416,7 @@ static void mj_parse_arr_end(mj_frame_stack_t *stack)
         return;
     }
 
-    if (mj_frame_state(frame) == ARR_EXPECT_FIRST_VAL_OR_END) {
+    if (mj_frame_state(frame) == ARR_EXPECT_VAL_OR_END) {
         pop_frame(stack);
         return;
     }
@@ -2193,4 +2181,21 @@ const myjson_t *myjson_get_arr_elem(const myjson_t *root, size_t idx)
         arr->arr[idx]->wrapper = wrap;
     }
     return arr->arr[idx]->wrapper;
+}
+
+strval_t myjson_get_obj_pair_strval(const myjson_t *pair)
+{
+    if (!pair || pair->root->type != MJ_NODE_PAIR) {
+        fprintf(stderr, "FAIL: Argument is null or is not pair type\n");
+        return (strval_t) {
+            .value = '\0',
+            .len = 0
+        };
+    }
+    mj_pair_node_t *pair_node = pair->root->node;
+    mj_str_node_t *str_node = pair_node->value;
+    return (strval_t) {
+        .value = str_node->value,
+        .len = str_node->len
+    };
 }
