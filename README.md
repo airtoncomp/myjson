@@ -33,6 +33,9 @@ myjson_free_root(root);
 To build a JSON document programmatically, create the required nodes with the `myjson_create_*` functions,
 attach child nodes to their parent nodes, and finally attach the top-level object to the root node.
 
+Each node is attached to a parent node until the complete JSON tree is connected to the root.
+Once the tree is no longer needed, call `myjson_free_root()` to release all memory owned by it.
+
 ```
 myjson_t *root = myjson_create_root();
 
@@ -53,6 +56,21 @@ myjson_print(root);
 myjson_free_root(root);
 ```
 
-Each node is attached to a parent node until the complete JSON tree is connected to the root.
-Once the tree is no longer needed, call `myjson_free_root()` to release all memory owned by it.
+To retrieve a value from a json object or array, we should use _get_ functions.
 
+```
+const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10, \"g\":true}";
+
+myjson_t *root = myjson_create_root();
+myjson_parse(root, str);
+
+const myjson_t *pair = myjson_get_obj_pair(mj, MJ_STR("a"));
+const strval_t val = myjson_get_strval_from_pair(pair);
+printf("string value: %.*s\n", (int) val.len, val.value);
+
+const myjson_t *int_pair = myjson_get_obj_pair(mj, MJ_STR("d"));
+int num = myjson_get_int_from_pair(int_pair);
+printf("number value: %d\n", num);
+
+myjson_free_root(mj);
+```
