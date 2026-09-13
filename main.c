@@ -157,6 +157,60 @@ void test_array()
     printf("\n--- END: TEST ARRAY CREATION ---\n");
 }
 
+void test_get_item()
+{
+    printf("\n--- START: TEST GET ITEM ---\n");
+
+    const char *str = "{\"a\":true, \"b\":{\"mykey\":\"myval\"}, \"c\":null}";
+
+    myjson_t *mj = myjson_create();
+    myjson_parse(mj, str);
+
+    myjson_print(mj);
+    printf("\n");
+
+    const myjson_t *item = myjson_get_obj_pair(mj, MJ_STR("mykey"));
+    printf("Ptr: %p\n", (void *)item);
+    myjson_print(item);
+    printf("\n");
+
+    const myjson_t *item2 = myjson_get_obj_pair(mj, MJ_STR("c"));
+    printf("Ptr: %p\n", (void *)item2);
+    myjson_print(item2);
+    printf("\n");
+
+    myjson_free_root(mj);
+
+    printf("\n--- END: TEST GET ITEM ---\n");
+}
+
+void test_get_item2()
+{
+    printf("\n--- START: TEST GET ITEM ---\n");
+
+    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10}";
+
+    myjson_t *mj = myjson_create();
+    myjson_parse(mj, str);
+
+    myjson_print(mj);
+    printf("\n");
+
+    const myjson_t *item = myjson_get_obj_pair(mj, MJ_STR("c"));
+    printf("Ptr: %p\n", (void *)item);
+    myjson_print(item);
+    printf("\n");
+
+    const myjson_t *item2 = myjson_get_obj_pair(mj, MJ_STR("e"));
+    printf("Ptr: %p\n", (void *)item2);
+    myjson_print(item2);
+    printf("\n");
+
+    myjson_free_root(mj);
+
+    printf("\n--- END: TEST GET ITEM ---\n");
+}
+
 int main () 
 {
     test();
@@ -172,6 +226,12 @@ int main ()
     printf("\n");
 
     test_array();
+    printf("\n");
+
+    test_get_item();
+    printf("\n");
+
+    test_get_item2();
     printf("\n");
 
     printf("myjson lib\n");
