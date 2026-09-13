@@ -82,6 +82,7 @@ void myjson_update_double_pair_in_obj(myjson_t *obj, const char *key, double val
 void myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_one);
 
 const myjson_t *myjson_get_obj_pair(const myjson_t *root, const char *key);
+const myjson_t *myjson_get_arr_elem(const myjson_t *root, size_t idx);
 
 int myjson_parse(myjson_t *mj, const char *json);
 void myjson_print(const myjson_t *mj);
