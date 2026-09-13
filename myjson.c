@@ -2140,7 +2140,6 @@ const myjson_t *myjson_get_obj_pair(const myjson_t *root, const char *key)
                         "Argument is not myjson node object");
 
     mj_obj_node_t *obj_node = root->root->node;
-
     for (size_t i = 0; i < obj_node->members.count; i++) {
         mj_node_t *node = obj_node->members.arr[i];
         mj_pair_node_t *pair_node = node->node;
@@ -2173,4 +2172,25 @@ const myjson_t *myjson_get_obj_pair(const myjson_t *root, const char *key)
     }
 
     return NULL;
+}
+
+const myjson_t *myjson_get_arr_elem(const myjson_t *root, size_t idx)
+{
+    if (!root || !root->root) {
+        MJ_LOG("Pointer to myjson_t or pointer to mj_node_t is null\n");
+        return NULL;
+    }
+
+    MJ_RET_NULL_ON_TRUE((root->root->type != MJ_NODE_ARRAY),
+                        "Argument is not myjson node array");
+
+    mj_arr_node_t *arr = root->root->node;
+    MJ_RET_NULL_ON_TRUE(idx > arr->count, "Index is out-of-range");
+
+    if (!arr->arr[idx]->wrapper) {
+        myjson_t *wrap = malloc(sizeof(*wrap));
+        wrap->root = arr->arr[idx];
+        arr->arr[idx]->wrapper = wrap;
+    }
+    return arr->arr[idx]->wrapper;
 }
