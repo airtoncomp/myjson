@@ -244,24 +244,42 @@ void test_get_value()
 {
     printf("\n--- START: TEST GET VALUE ---\n");
 
-    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10}";
+    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10, \"g\":true}";
 
     myjson_t *mj = myjson_create_root();
     myjson_parse(mj, str);
 
     const myjson_t *pair = myjson_get_obj_pair(mj, MJ_STR("a"));
-
-    printf("Ptr: %p\n", (void*)pair);
-
     myjson_print(pair);
     printf("\n");
 
-    const strval_t val = myjson_get_obj_pair_strval(pair);
+    const strval_t val = myjson_get_strval_from_pair(pair);
+    printf("string len: %zu, string value: %.*s\n", val.len, (int) val.len, val.value);
 
+    const myjson_t *int_pair = myjson_get_obj_pair(mj, MJ_STR("d"));
+    myjson_print(int_pair);
+    printf("\n");
+    int num = myjson_get_int_from_pair(int_pair);
+    printf("number value: %d\n", num);
     myjson_print(mj);
     printf("\n");
 
-    printf("string len: %zu, string value: %.*s\n", val.len, (int) val.len, val.value);
+    const myjson_t *double_pair = myjson_get_obj_pair(mj, MJ_STR("e"));
+    myjson_print(double_pair);
+    printf("\n");
+    double num_f = myjson_get_double_from_pair(double_pair);
+    printf("number value: %lf\n", num_f);
+    myjson_print(mj);
+    printf("\n");
+
+    const myjson_t *bool_pair = myjson_get_obj_pair(mj, MJ_STR("g"));
+    myjson_print(bool_pair);
+    printf("\n");
+    int b = myjson_get_bool_from_pair(bool_pair);
+    printf("bool value: %d\n", b);
+    myjson_print(mj);
+    printf("\n");
+
 
     myjson_free_root(mj);
 
