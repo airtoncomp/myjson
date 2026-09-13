@@ -2183,7 +2183,7 @@ const myjson_t *myjson_get_arr_elem(const myjson_t *root, size_t idx)
     return arr->arr[idx]->wrapper;
 }
 
-strval_t myjson_get_obj_pair_strval(const myjson_t *pair)
+strval_t myjson_get_strval_from_pair(const myjson_t *pair)
 {
     if (!pair || pair->root->type != MJ_NODE_PAIR) {
         fprintf(stderr, "FAIL: Argument is null or is not pair type\n");
@@ -2198,4 +2198,57 @@ strval_t myjson_get_obj_pair_strval(const myjson_t *pair)
         .value = str_node->value,
         .len = str_node->len
     };
+}
+
+int myjson_get_int_from_pair(const myjson_t *pair)
+{
+    if (!pair || pair->root->type != MJ_NODE_PAIR) {
+        fprintf(stderr, "FAIL: Argument is null or is not pair type\n");
+        return 0;
+    }
+    mj_pair_node_t *pair_node = pair->root->node;
+    mj_node_t *node = pair_node->value;
+    if (node->type == MJ_NODE_INT_BYTE) {
+        return ((mj_int_byte_node_t *) node)->value;
+    }
+    mj_num_node_t *num_node = node->node;
+    char buf[64] = {0};
+    snprintf(buf, 64, "%*s", (int) num_node->len, num_node->value);
+    return atoi(buf);
+}
+
+double myjson_get_double_from_pair(const myjson_t *pair)
+{
+    if (!pair || pair->root->type != MJ_NODE_PAIR) {
+        fprintf(stderr, "FAIL: Argument is null or is not pair type\n");
+        return 0.0;
+    }
+    mj_pair_node_t *pair_node = pair->root->node;
+    mj_node_t *node = pair_node->value;
+    if (node->type == MJ_NODE_DOUBLE_BYTE) {
+        return ((mj_double_byte_node_t *) node)->value;
+    }
+    mj_num_node_t *num_node = node->node;
+    char buf[64] = {0};
+    snprintf(buf, 64, "%*s", (int) num_node->len, num_node->value);
+    return atof(buf);
+}
+
+int myjson_get_bool_from_pair(const myjson_t *pair)
+{
+    if (!pair || pair->root->type != MJ_NODE_PAIR) {
+        fprintf(stderr, "FAIL: Argument is null or is not pair type\n");
+        return 0;
+    }
+    mj_pair_node_t *pair_node = pair->root->node;
+    mj_node_t *node = pair_node->value;
+    if (node->type == MJ_NODE_MUT_BOOL) {
+        mj_mut_bool_node_t *bool_node = node->node;
+        return strcmp(bool_node->value, "true") == 0 ? 1 : 0;
+    }
+    if (node->type == MJ_NODE_BOOL) {
+        mj_bool_node_t *bool_node = node->node;
+        return strncmp(bool_node->value, "true", bool_node->len) == 0 ? 1 : 0;
+    }
+    return 0;
 }
