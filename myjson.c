@@ -911,16 +911,19 @@ static int append_mj_node(mj_arr_node_t *arr, mj_node_t *node)
     assert(arr != NULL && "Array cannot be null");
 
     if (arr->count >= arr->cap && arr->allow_growth) {
+        size_t old_cap = arr->cap;
         size_t new_cap = arr->cap * MJ_NODE_ARRAY_GROWTH_FACTOR;
-        mj_node_t **tmp = realloc(arr->arr, new_cap * sizeof(arr->arr));
+        mj_node_t **tmp = realloc(arr->arr, new_cap * sizeof(*arr->arr));
         MJ_RET_ERR_ON_NULL(tmp, "Out of memory failure");
-        mj_free_arr_node(arr);
+
+        /* Zero-initialize newly allocated slots so unused entries are NULL. */
+        for (size_t i = old_cap; i < new_cap; i++)
+            tmp[i] = NULL;
+
         arr->arr = tmp;
         arr->cap = new_cap;
     }
-
     arr->arr[arr->count++] = node;
-
     return 0;
 }
 
