@@ -58,33 +58,33 @@ myjson_t *myjson_create_pair_null(const char *key);
 myjson_t *myjson_create_pair_arr(const char *key, myjson_t *arr);
 myjson_t *myjson_create_arr(size_t cap);
 
-void myjson_add_obj_to_root(myjson_t *root, myjson_t *obj);
-void myjson_add_arr_to_root(myjson_t *root, myjson_t *arr);
-void myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair);
+int myjson_add_obj_to_root(myjson_t *root, myjson_t *obj);
+int myjson_add_arr_to_root(myjson_t *root, myjson_t *arr);
+int myjson_add_pair_to_obj(myjson_t *obj, myjson_t *pair);
 
-void myjson_append_str_to_arr(myjson_t *arr, char *val);
-void myjson_append_int_to_arr(myjson_t *arr, int val);
-void myjson_append_double_to_arr(myjson_t *arr, double val);
-void myjson_append_true_to_arr(myjson_t *arr);
-void myjson_append_false_to_arr(myjson_t *arr);
-void myjson_append_null_to_arr(myjson_t *arr);
-void myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj);
+int myjson_append_str_to_arr(myjson_t *arr, char *val);
+int myjson_append_int_to_arr(myjson_t *arr, int val);
+int myjson_append_double_to_arr(myjson_t *arr, double val);
+int myjson_append_true_to_arr(myjson_t *arr);
+int myjson_append_false_to_arr(myjson_t *arr);
+int myjson_append_null_to_arr(myjson_t *arr);
+int myjson_append_obj_to_arr(myjson_t *arr, myjson_t *obj);
 
-void myjson_replace_arr_elem_w_int(myjson_t *arr, size_t idx, int elem);
-void myjson_replace_arr_elem_w_double(myjson_t *arr, size_t idx, double elem);
-void myjson_replace_arr_elem_w_true(myjson_t *arr, size_t idx);
-void myjson_replace_arr_elem_w_false(myjson_t *arr, size_t idx);
-void myjson_replace_arr_elem_w_null(myjson_t *arr, size_t idx);
-void myjson_replace_arr_elem_w_str(myjson_t *arr, size_t idx, char *elem);
+int myjson_replace_arr_elem_w_int(myjson_t *arr, size_t idx, int elem);
+int myjson_replace_arr_elem_w_double(myjson_t *arr, size_t idx, double elem);
+int myjson_replace_arr_elem_w_true(myjson_t *arr, size_t idx);
+int myjson_replace_arr_elem_w_false(myjson_t *arr, size_t idx);
+int myjson_replace_arr_elem_w_null(myjson_t *arr, size_t idx);
+int myjson_replace_arr_elem_w_str(myjson_t *arr, size_t idx, char *elem);
 
-void myjson_del_pair_from_obj(myjson_t *obj, const char *key);
-void myjson_del_elem_from_arr(myjson_t *arr, size_t idx);
+int myjson_del_pair_from_obj(myjson_t *obj, const char *key);
+int myjson_del_elem_from_arr(myjson_t *arr, size_t idx);
 
-void myjson_update_pair_in_obj(myjson_t *obj, const char *key, const myjson_t *mj);
-void myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, const char *val);
-void myjson_update_int_pair_in_obj(myjson_t *obj, const char *key, int val);
-void myjson_update_double_pair_in_obj(myjson_t *obj, const char *key, double val);
-void myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_one);
+int myjson_update_pair_in_obj(myjson_t *obj, const char *key, const myjson_t *mj);
+int myjson_update_str_pair_in_obj(myjson_t *obj, const char *key, const char *val);
+int myjson_update_int_pair_in_obj(myjson_t *obj, const char *key, int val);
+int myjson_update_double_pair_in_obj(myjson_t *obj, const char *key, double val);
+int myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_one);
 
 const myjson_t *myjson_get_obj_pair(const myjson_t *root, const char *key);
 strval_t myjson_get_strval_from_pair(const myjson_t *pair);
