@@ -17,14 +17,15 @@ void test()
     //const char *str = "{\"a\":0.0e12, \"b\":0.1E-56, \"c\":2.5e+4, \"d\":6e7}";
     //const char *str = "{\"a\":true, \"b\":false, \"c\":null}";
     //const char *str = "{\"a\":true, \"b\":{\"mykey\":\"myval\"}, \"c\":null}";
-    //const char *str = "{\"a\":true, \"b\":{\"mykey\":\"myval\"}, \"c\":null}";
     //const char *str = "{\"a\":true}";
     //const char *str = "{\"a\":[true]}";
     //const char *str = "{\"a\":[{\"b\":\"c\"},{\"d\":true}, \"elem\"]}";
     //const char *str = "[\"a\",true]";
     //const char *str = "{\"a\":\"c\"}";
     //const char *str = "{\"a\":2}";
-    const char *str = "{\"a\":[{\"b\":\"c\"},{\"d\":true},\"elem\"]}";
+    //const char *str = "{\"a\":[{\"b\":\"c\"},{\"d\":true},\"elem\"]}";
+    //const char *str = "{}";
+    const char *str = "{\"a\":[{}]}";
 
     printf("%s\n", str);
 
@@ -239,6 +240,34 @@ void test_get_arr_elem()
     printf("\n--- END: TEST GET ARRAY ELEM---\n");
 }
 
+void test_get_value()
+{
+    printf("\n--- START: TEST GET VALUE ---\n");
+
+    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10}";
+
+    myjson_t *mj = myjson_create_root();
+    myjson_parse(mj, str);
+
+    const myjson_t *pair = myjson_get_obj_pair(mj, MJ_STR("a"));
+
+    printf("Ptr: %p\n", (void*)pair);
+
+    myjson_print(pair);
+    printf("\n");
+
+    const strval_t val = myjson_get_obj_pair_strval(pair);
+
+    myjson_print(mj);
+    printf("\n");
+
+    printf("string len: %zu, string value: %.*s\n", val.len, (int) val.len, val.value);
+
+    myjson_free_root(mj);
+
+    printf("\n--- END: TEST GET VALUE ---\n");
+}
+
 int main () 
 {
     test();
@@ -263,6 +292,9 @@ int main ()
     printf("\n");
 
     test_get_arr_elem();
+    printf("\n");
+
+    test_get_value();
     printf("\n");
 
     printf("myjson lib\n");
