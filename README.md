@@ -1,4 +1,6 @@
-# MyJSON
+<img src="img/logo-myjson.png" alt="logo myjson" width="250">
+
+## MyJSON library
 
 MyJSON is a lightweight JSON parsing library created as a personal project.
 It can be added directly to your project and used wherever its features meet your requirements.
