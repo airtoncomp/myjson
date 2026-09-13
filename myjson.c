@@ -2127,7 +2127,7 @@ void myjson_del_elem_from_arr(myjson_t *arr, size_t idx)
     arr_node->count--;
 }
 
-const myjson_t *myjson_get_item(const myjson_t *root, const char *key)
+const myjson_t *myjson_get_obj_pair(const myjson_t *root, const char *key)
 {    
     MJ_RET_NULL_ON_TRUE(!key, "Key is null pointer");
 
@@ -2166,7 +2166,7 @@ const myjson_t *myjson_get_item(const myjson_t *root, const char *key)
                 wrap->root = value;
                 value->wrapper = wrap;
             }
-            const myjson_t *item = myjson_get_item(value->wrapper, key);
+            const myjson_t *item = myjson_get_obj_pair(value->wrapper, key);
             if (item)
                 return item;
         }
