@@ -2131,39 +2131,44 @@ const myjson_t *myjson_get_item(const myjson_t *root, const char *key)
 {    
     MJ_RET_NULL_ON_TRUE(!key, "Key is null pointer");
 
-    if (!root) {
-        MJ_LOG("Pointer to myjson_t is null\n");
+    if (!root || !root->root) {
+        MJ_LOG("Pointer to myjson_t or pointer to mj_node_t is null\n");
         return NULL;
     }
-    
-    if (root->root->type == MJ_NODE_OBJECT) {
-        mj_obj_node_t *obj_node = root->root->node;
-        for (size_t i = 0; i < obj_node->members.count; i++) {
-            mj_pair_node_t *pair_node = obj_node->members.arr[i]->node;
-            if (strncmp(pair_node->key, key, pair_node->keylen) == 0) { 
-                MJ_LOG("Found key: %s\n", key);
 
-                /* The key exist, but wrapper can be null if the json string
-                   has been parsed by myjson_parse(), instead of being built 
-                   by myjson_create_xxx functions */
+    MJ_RET_NULL_ON_TRUE((root->root->type != MJ_NODE_OBJECT),
+                        "Argument is not myjson node object");
 
-                if (!obj_node->members.arr[i]->wrapper) {
-                    myjson_t *wrap = malloc(sizeof(*wrap));
-                    wrap->root = obj_node->members.arr[i];
-                    wrap->root->type = MJ_NODE_PAIR;
-                    obj_node->members.arr[i]->wrapper = wrap;
-                }
+    mj_obj_node_t *obj_node = root->root->node;
 
-                return obj_node->members.arr[i]->wrapper;
+    for (size_t i = 0; i < obj_node->members.count; i++) {
+        mj_node_t *node = obj_node->members.arr[i];
+        mj_pair_node_t *pair_node = node->node;
+        if (strncmp(pair_node->key, key, pair_node->keylen) == 0) {
+            MJ_LOG("Found key: %s\n", key);
+
+            /*
+             * The key exists, but wrapper can be NULL if the JSON
+             * string was parsed by myjson_parse() instead of being
+             * built with myjson_create_*().
+             */
+            if (!node->wrapper) {
+                myjson_t *wrap = malloc(sizeof(*wrap));
+                wrap->root = node;
+                node->wrapper = wrap;
             }
-            if (((mj_node_t *) pair_node->value)->type == MJ_NODE_OBJECT) {
-                const myjson_t *mj = myjson_get_item(((mj_node_t *) pair_node->value)->wrapper, key);
-                if (!mj) { 
-                    MJ_LOG("Key not found");
-                    return NULL;
-                }
-                return mj;
+            return node->wrapper;
+        }
+        mj_node_t *value = pair_node->value;
+        if (value->type == MJ_NODE_OBJECT) {
+            if (!value->wrapper) {
+                myjson_t *wrap = malloc(sizeof(*wrap));
+                wrap->root = value;
+                value->wrapper = wrap;
             }
+            const myjson_t *item = myjson_get_item(value->wrapper, key);
+            if (item)
+                return item;
         }
     }
 
