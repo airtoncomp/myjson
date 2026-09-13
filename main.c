@@ -211,6 +211,34 @@ void test_get_item2()
     printf("\n--- END: TEST GET ITEM ---\n");
 }
 
+void test_get_arr_elem()
+{
+    printf("\n--- START: TEST GET ARRAY ELEM---\n");
+
+    myjson_t *mj = myjson_create_root();
+    myjson_t *arr = myjson_create_arr(7);
+    
+    myjson_append_str_to_arr(arr, MJ_STR("testing-array"));
+    myjson_append_int_to_arr(arr, 9093);
+    myjson_append_double_to_arr(arr, -86e-3);
+    myjson_append_true_to_arr(arr);
+    myjson_append_false_to_arr(arr);
+    myjson_append_null_to_arr(arr);
+
+    myjson_add_arr_to_root(mj, arr);
+
+    myjson_print(mj);
+    printf("\n");
+
+    const myjson_t *elem = myjson_get_arr_elem(mj, 2);
+    myjson_print(elem);
+    printf("\n");
+
+    myjson_free_root(mj);
+
+    printf("\n--- END: TEST GET ARRAY ELEM---\n");
+}
+
 int main () 
 {
     test();
@@ -232,6 +260,9 @@ int main ()
     printf("\n");
 
     test_get_item2();
+    printf("\n");
+
+    test_get_arr_elem();
     printf("\n");
 
     printf("myjson lib\n");
