@@ -42,18 +42,10 @@
             fprintf(stderr, __VA_ARGS__);                               \
         } while(0)
 
-#define MJ_LOG_STR(fmt, start, len, ...) do {                           \
-            char buf[1024] = {0};                                       \
-            snprintf(buf, len, "%s", start);                            \
-            buf[val_len] = '\0';                                        \
-            MJ_LOG(fmt, buf, ##__VA_ARGS__);                            \
-        } while(0)
-
 #else
 
 #define MJ_LOG(stdout, ...)                 ((void)0)
 #define MJ_LOGE(stderr, ...)                ((void)0)
-#define MJ_LOG_STR(fmt, start, len, ...)    ((void)0)
 
 #endif
 
@@ -265,8 +257,6 @@ static int scan_str(const char **cptr, mjtok_t *out)
        the scan_str() is called. We should keep the pointer
        exactly where the character '"' is.*/
     (*cptr)--;
-    
-    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
@@ -330,8 +320,6 @@ static int scan_num(const char **cptr, mjtok_t *out)
        exactly where the last digit is.*/
     (*cptr)--;
 
-    MJ_LOG_STR("string: %s\n", val, val_len+1);
-
     return 0;
 }
 
@@ -362,8 +350,6 @@ static int scan_bool_true(const char **cptr, mjtok_t *out)
        the scan_str() is called. We should keep the pointer
        exactly where the character 'e' is.*/
     (*cptr)--;
-
-    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
@@ -396,8 +382,6 @@ static int scan_bool_false(const char **cptr, mjtok_t *out)
        exactly where the character 'e' is.*/
     (*cptr)--;
 
-    MJ_LOG_STR("string: %s\n", val, val_len+1);
-
     return 0;
 }
 
@@ -428,8 +412,6 @@ static int scan_value_null(const char **cptr, mjtok_t *out)
        the scan_str() is called. We should keep the pointer
        exactly where the character 'l' is.*/
     (*cptr)--;
-
-    MJ_LOG_STR("string: %s\n", val, val_len+1);
 
     return 0;
 }
@@ -1666,6 +1648,9 @@ static void mj_print_node(const mj_node_t *node)
     case MJ_NODE_ARRAY:
         mj_print_arr_node(node->node);
         break;
+    case MJ_NODE_PAIR:
+        mj_print_pair_node(node->node);
+        break;
     case MJ_NODE_STRING: {
         mj_str_node_t *str_node = node->node;
         mj_print_str_node(str_node->value, str_node->len);
@@ -2140,4 +2125,47 @@ void myjson_del_elem_from_arr(myjson_t *arr, size_t idx)
     }
     mj_arr_node_idx(arr_node, arr_node->count) = NULL;
     arr_node->count--;
+}
+
+const myjson_t *myjson_get_item(const myjson_t *root, const char *key)
+{    
+    MJ_RET_NULL_ON_TRUE(!key, "Key is null pointer");
+
+    if (!root) {
+        MJ_LOG("Pointer to myjson_t is null\n");
+        return NULL;
+    }
+    
+    if (root->root->type == MJ_NODE_OBJECT) {
+        mj_obj_node_t *obj_node = root->root->node;
+        for (size_t i = 0; i < obj_node->members.count; i++) {
+            mj_pair_node_t *pair_node = obj_node->members.arr[i]->node;
+            if (strncmp(pair_node->key, key, pair_node->keylen) == 0) { 
+                MJ_LOG("Found key: %s\n", key);
+
+                /* The key exist, but wrapper can be null if the json string
+                   has been parsed by myjson_parse(), instead of being built 
+                   by myjson_create_xxx functions */
+
+                if (!obj_node->members.arr[i]->wrapper) {
+                    myjson_t *wrap = malloc(sizeof(*wrap));
+                    wrap->root = obj_node->members.arr[i];
+                    wrap->root->type = MJ_NODE_PAIR;
+                    obj_node->members.arr[i]->wrapper = wrap;
+                }
+
+                return obj_node->members.arr[i]->wrapper;
+            }
+            if (((mj_node_t *) pair_node->value)->type == MJ_NODE_OBJECT) {
+                const myjson_t *mj = myjson_get_item(((mj_node_t *) pair_node->value)->wrapper, key);
+                if (!mj) { 
+                    MJ_LOG("Key not found");
+                    return NULL;
+                }
+                return mj;
+            }
+        }
+    }
+
+    return NULL;
 }
