@@ -2193,7 +2193,7 @@ strval_t myjson_get_obj_pair_strval(const myjson_t *pair)
         };
     }
     mj_pair_node_t *pair_node = pair->root->node;
-    mj_str_node_t *str_node = pair_node->value;
+    mj_str_node_t *str_node = ((mj_node_t *) pair_node->value)->node;
     return (strval_t) {
         .value = str_node->value,
         .len = str_node->len
