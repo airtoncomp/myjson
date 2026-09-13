@@ -189,7 +189,7 @@ void test_get_item2()
 {
     printf("\n--- START: TEST GET ITEM ---\n");
 
-    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10}";
+    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":2.7e10}";
 
     myjson_t *mj = myjson_create();
     myjson_parse(mj, str);
@@ -244,7 +244,7 @@ void test_get_value()
 {
     printf("\n--- START: TEST GET VALUE ---\n");
 
-    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":0.0e10, \"g\":true}";
+    const char *str = "{\"a\":\"b\", \"c\":[], \"d\":1, \"e\":2.4, \"f\":-3.7e10, \"g\":true}";
 
     myjson_t *mj = myjson_create_root();
     myjson_parse(mj, str);
