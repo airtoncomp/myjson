@@ -26,6 +26,11 @@
 
 #define MJ_STR(x) #x
 
+typedef struct {
+    const char *value;
+    size_t len;
+} strval_t;
+
 /**
  * Public JSON value type exposed by the library.
  * Users should refer to this type through the myjson_t
@@ -82,6 +87,7 @@ void myjson_update_double_pair_in_obj(myjson_t *obj, const char *key, double val
 void myjson_update_bool_pair_in_obj(myjson_t *obj, const char *key, int zero_or_one);
 
 const myjson_t *myjson_get_obj_pair(const myjson_t *root, const char *key);
+strval_t myjson_get_obj_pair_strval(const myjson_t *pair);
 const myjson_t *myjson_get_arr_elem(const myjson_t *root, size_t idx);
 
 int myjson_parse(myjson_t *mj, const char *json);
